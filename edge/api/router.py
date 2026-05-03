@@ -18,6 +18,7 @@ from typing import Any, Optional
 import cv2
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from api.sender import create_dummy_packet, ServerSender
@@ -113,26 +114,75 @@ async def get_status() -> dict[str, Any]:
 
 # ── 수동 검사 트리거 ──────────────────────────────────────────────────────────
 
-@router.post("/inspect/trigger", summary="수동 검사 트리거")
-async def trigger_inspection(background_tasks: BackgroundTasks) -> dict[str, str]:
+@router.post("/inspect/trigger", summary="수동 검사 실행")
+async def trigger_inspection() -> dict[str, str]:
     """
     운영자가 HTTP 요청으로 즉시 검사를 한 번 실행하도록 트리거한다.
 
-    실제 검사 파이프라인은 main.py의 run_inspection_pipeline()을 호출하며,
-    BackgroundTasks로 비동기 실행하여 API 응답을 즉시 반환한다.
+    실제 검사 파이프라인은 main.py의 run_inspection_pipeline()을 직접 호출하며,
+    요청은 검사 완료 시점에 응답한다.
 
     Returns:
-        요청 수락 메시지 (실제 검사 결과는 서버 DB에서 확인)
+        검사 완료 메시지 (상세 결과는 서버 DB에서 확인)
     """
-    logger.info("[라우터] 수동 검사 트리거 요청 수신")
+    logger.info("[라우터] 수동 검사 실행 요청 수신")
 
     # main 모듈의 파이프라인을 지연 import (순환 참조 방지)
     try:
         from main import run_inspection_pipeline
-        background_tasks.add_task(run_inspection_pipeline)
-        return {"message": "검사가 백그라운드에서 시작되었습니다."}
+
+        packet = await run_inspection_pipeline()
+        if packet is None:
+            raise HTTPException(status_code=500, detail="검사 실행 중 오류가 발생했습니다.")
+
+        return {"message": f"PCB가 중앙에서 5초간 안정된 뒤 검사 완료되었습니다. 결과: {packet.result.value}"}
     except ImportError:
         raise HTTPException(status_code=503, detail="검사 파이프라인을 로드할 수 없습니다.")
+
+
+@router.get("/camera/stream", summary="라즈베리 카메라 MJPEG 스트림")
+async def stream_camera() -> StreamingResponse:
+    """
+    브라우저에서 <img src> 로 바로 볼 수 있는 MJPEG 스트림.
+
+    현재 파이프라인은 단발 검사 중심이므로 이 스트림은 "실시간 카메라 프리뷰" 역할을 하며,
+    수동 검사와 같은 카메라 장치를 공유한다.
+    """
+    try:
+        import main as main_mod
+
+        cam = getattr(main_mod, "camera", None)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"카메라 상태 확인 실패: {e}") from e
+
+    if cam is None:
+        raise HTTPException(status_code=503, detail="카메라가 초기화되지 않았습니다.")
+
+    async def frame_generator():
+        while True:
+            try:
+                frame = cam.capture()
+                ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if not ok:
+                    await asyncio.sleep(0.1)
+                    continue
+
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + encoded.tobytes()
+                    + b"\r\n"
+                )
+                await asyncio.sleep(0.12)
+            except Exception as e:
+                logger.warning("[카메라 스트림] 프레임 전송 실패: %s", e)
+                await asyncio.sleep(0.3)
+
+    return StreamingResponse(
+        frame_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
 
 
 _EDGE_ROOT = Path(__file__).resolve().parent.parent

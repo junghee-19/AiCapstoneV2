@@ -44,6 +44,20 @@ class Settings(BaseSettings):
     CAMERA_FOCUS_MANUAL_REAPPLY_DELAY_SEC: float = Field(default=0.25, ge=0.0, le=2.0)
     # 수동 모드에서도 0보다 크면: 연속 AF를 이 시간(ms)만 돌린 뒤 AF 끄고 focus_absolute 적용 (재연결 후 흐림 완화)
     CAMERA_FOCUS_POST_PLUG_AF_MS: int = Field(default=0, ge=0, le=10000)
+    # 수동 검사 시 PCB가 화면 중앙에 들어온 뒤 거의 안 움직이는 상태를 이 시간(초) 유지하면 캡처
+    CAMERA_STABLE_HOLD_SEC: float = Field(default=5.0, ge=0.5, le=30.0)
+    # 위 조건을 기다리는 최대 시간(초). 초과 시 최신 프레임으로 강제 진행
+    CAMERA_STABLE_WAIT_TIMEOUT_SEC: float = Field(default=20.0, ge=1.0, le=120.0)
+    # 피듀셜 중점이 화면 중심에서 이 비율 이내면 "중앙"으로 간주 (가로/세로 각각 적용)
+    CAMERA_CENTER_TOLERANCE_RATIO: float = Field(default=0.12, ge=0.01, le=0.5)
+    # 연속 프레임 간 피듀셜 중점 이동 허용치(px). 이하면 "거의 안 움직임"으로 간주
+    CAMERA_STABLE_CENTER_DELTA_PX: float = Field(default=12.0, ge=1.0, le=200.0)
+    # 연속 프레임 간 피듀셜 간격(span) 변화 허용치(px)
+    CAMERA_STABLE_SPAN_DELTA_PX: float = Field(default=16.0, ge=1.0, le=300.0)
+    # 연속 프레임 간 각도 변화 허용치(°)
+    CAMERA_STABLE_ANGLE_DELTA_DEG: float = Field(default=1.5, ge=0.1, le=30.0)
+    # 안정 상태 확인 중 프레임 샘플링 주기(초)
+    CAMERA_STABLE_SAMPLE_INTERVAL_SEC: float = Field(default=0.2, ge=0.01, le=2.0)
 
     # ── YOLO 추론 설정 ───────────────────────────────────────────────────────
     # Stage 1: 피듀셜 마크 탐지 모델 (클래스: FIDUCIAL)

@@ -15,6 +15,10 @@ function edgeUrl(path: string) {
   return `${EDGE_BASE_URL}${path}`
 }
 
+export function getEdgeCameraStreamUrl(): string {
+  return edgeUrl('/edge/camera/stream')
+}
+
 /**
  * 수동 PCB 검사 1회 실행 (백그라운드). 결과는 Spring Boot DB에 적재된다.
  */
