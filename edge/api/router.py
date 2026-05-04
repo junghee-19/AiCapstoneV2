@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import cv2
+import numpy as np
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -32,6 +33,69 @@ router = APIRouter(prefix="/edge", tags=["Edge Device"])
 # ── 자동 연속 검사 상태 관리 ──────────────────────────────────────────────────
 _auto_running: bool = False       # 자동 검사 루프 실행 중 여부
 _auto_interval: float = 5.0      # 검사 간격 (초)
+
+
+def _draw_detection_overlay(frame: np.ndarray, fiducials: list[Any], alignment: Any) -> np.ndarray:
+    """실시간 스트림 프레임에 피듀셜/PCB 인식 가이드를 그린다."""
+    annotated = frame.copy()
+
+    for idx, item in enumerate(fiducials[:2], start=1):
+        x = int(item.bbox.x)
+        y = int(item.bbox.y)
+        w = int(item.bbox.width)
+        h = int(item.bbox.height)
+        cv2.rectangle(annotated, (x, y), (x + w, y + h), (0, 220, 255), 2)
+        cv2.putText(
+            annotated,
+            f"Fiducial {idx}",
+            (x, max(24, y - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 220, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+    if alignment.fiducial1 is not None and alignment.fiducial2 is not None:
+        from inference.alignment import crop_inspection_roi_with_offset
+
+        h, w = annotated.shape[:2]
+        _, roi_x, roi_y = crop_inspection_roi_with_offset(annotated, alignment)
+        b1 = alignment.fiducial1.bbox
+        b2 = alignment.fiducial2.bbox
+        roi_w = max(b1.x + b1.width, b2.x + b2.width) - min(b1.x, b2.x)
+        roi_h = max(b1.y + b1.height, b2.y + b2.height) - min(b1.y, b2.y)
+        pad_x = int(roi_w * 0.05)
+        pad_y = int(roi_h * 0.05)
+        x_min = max(0, roi_x)
+        y_min = max(0, roi_y)
+        x_max = min(w, x_min + roi_w + pad_x * 2)
+        y_max = min(h, y_min + roi_h + pad_y * 2)
+
+        cv2.rectangle(annotated, (x_min, y_min), (x_max, y_max), (80, 255, 120), 3)
+        cv2.putText(
+            annotated,
+            "PCB DETECTED",
+            (x_min, max(28, y_min - 10)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (80, 255, 120),
+            2,
+            cv2.LINE_AA,
+        )
+    else:
+        cv2.putText(
+            annotated,
+            "Searching PCB...",
+            (28, 42),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (0, 170, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+    return annotated
 
 
 # ── 상태 조회 ─────────────────────────────────────────────────────────────────
@@ -152,17 +216,30 @@ async def stream_camera() -> StreamingResponse:
         import main as main_mod
 
         cam = getattr(main_mod, "camera", None)
+        stage1 = (
+            getattr(main_mod, "fiducial_detector", None)
+            if settings.USE_SEPARATE_MODELS
+            else getattr(main_mod, "detector", None)
+        )
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"카메라 상태 확인 실패: {e}") from e
 
     if cam is None:
         raise HTTPException(status_code=503, detail="카메라가 초기화되지 않았습니다.")
+    if stage1 is None:
+        raise HTTPException(status_code=503, detail="YOLO 모델이 초기화되지 않았습니다.")
 
     async def frame_generator():
         while True:
             try:
                 frame = cam.capture()
-                ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                from inference.alignment import compute_alignment
+
+                fiducials, _ = stage1.detect_fiducials(frame)
+                alignment = compute_alignment(fiducials)
+                annotated = _draw_detection_overlay(frame, fiducials, alignment)
+
+                ok, encoded = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
                 if not ok:
                     await asyncio.sleep(0.1)
                     continue

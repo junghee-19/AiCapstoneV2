@@ -297,7 +297,11 @@ app = FastAPI(
 # CORS 설정: 같은 LAN의 운영자 PC 브라우저에서 직접 접근 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 운영 환경에서는 특정 IP로 제한할 것
+    allow_origins=[
+        "https://ai-capstone-v2.vercel.app",
+        "https://ai-capstone-v2-junghee-19s-projects.vercel.app",
+        "https://deepsight.웹.한국",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
