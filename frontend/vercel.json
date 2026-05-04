@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://aicapstonev2-production.up.railway.app/api/:path*"
+      "destination": "http://34.64.183.23:8080/api/:path*"
     },
     {
       "source": "/edge/:path*",
