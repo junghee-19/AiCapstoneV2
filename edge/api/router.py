@@ -21,11 +21,17 @@ import cv2
 import numpy as np
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from api.sender import create_dummy_packet, ServerSender
 from config.settings import settings
+from runtime.inspection_control import (
+    auto_status,
+    start_auto_inspection,
+    stop_auto_inspection,
+    trigger_inspection_once,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +49,6 @@ def _normalize_stage2_mode(stage2_source: Optional[str]) -> str:
     if mode not in {"raw", "aligned"}:
         raise HTTPException(status_code=400, detail="stage2Source must be 'raw' or 'aligned'")
     return mode
-
-# ── 자동 연속 검사 상태 관리 ──────────────────────────────────────────────────
-_auto_running: bool = False       # 자동 검사 루프 실행 중 여부
-_auto_interval: float = 5.0      # 검사 간격 (초)
-
 
 def _draw_detection_overlay(frame: np.ndarray, fiducials: list[Any], alignment: Any) -> np.ndarray:
     """실시간 스트림 프레임에 피듀셜/PCB 인식 가이드를 그린다."""
@@ -280,17 +281,11 @@ async def trigger_inspection() -> dict[str, str]:
     """
     logger.info("[라우터] 수동 검사 실행 요청 수신")
 
-    # main 모듈의 파이프라인을 지연 import (순환 참조 방지)
     try:
-        from main import run_inspection_pipeline
-
-        packet = await run_inspection_pipeline()
-        if packet is None:
-            raise HTTPException(status_code=500, detail="검사 실행 중 오류가 발생했습니다.")
-
+        packet = await trigger_inspection_once()
         return {"message": f"PCB가 중앙에서 5초간 안정된 뒤 검사 완료되었습니다. 결과: {packet.result.value}"}
-    except ImportError:
-        raise HTTPException(status_code=503, detail="검사 파이프라인을 로드할 수 없습니다.")
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.get("/camera/stream", summary="라즈베리 카메라 MJPEG 스트림")
@@ -602,54 +597,25 @@ async def auto_inspect_start(
     Args:
         interval: 검사 간격 (초, 기본값 5초)
     """
-    global _auto_running, _auto_interval
-    if _auto_running:
-        return {"message": f"자동 검사가 이미 실행 중입니다. (간격: {_auto_interval}초)"}
-
-    _auto_running = True
-    _auto_interval = interval
-    logger.info("[시연] 자동 연속 검사 시작 — 간격: %.1f초", interval)
-
-    background_tasks.add_task(_auto_inspect_loop)
+    before = auto_status()
+    try:
+        status = await start_auto_inspection(interval)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if before["running"]:
+        return {"message": f"자동 검사가 이미 실행 중입니다. (간격: {status['interval_seconds']}초)"}
     return {"message": f"✅ 자동 검사 시작 (간격: {interval}초) — /edge/inspect/auto/stop 으로 중지"}
 
 
 @router.post("/inspect/auto/stop", summary="[시연용] 자동 연속 검사 중지")
 async def auto_inspect_stop() -> dict[str, str]:
     """자동 반복 검사를 중지합니다."""
-    global _auto_running
-    _auto_running = False
     logger.info("[시연] 자동 연속 검사 중지 요청")
+    await stop_auto_inspection()
     return {"message": "⏹ 자동 검사 중지됨"}
 
 
 @router.get("/inspect/auto/status", summary="자동 검사 실행 상태 조회")
 async def auto_inspect_status() -> dict[str, Any]:
     """자동 검사 실행 여부와 설정된 간격을 반환합니다."""
-    return {
-        "running": _auto_running,
-        "interval_seconds": _auto_interval,
-    }
-
-
-async def _auto_inspect_loop() -> None:
-    """
-    자동 연속 검사 백그라운드 루프.
-    라이브 프레임에서 PCB가 보일 때만 본검사를 수행합니다.
-    """
-    global _auto_running
-    idle_poll_seconds = 0.5
-    while _auto_running:
-        try:
-            from main import run_inspection_pipeline_when_pcb_present
-            logger.info("[자동검사] PCB 감시 중...")
-            performed = await asyncio.to_thread(run_inspection_pipeline_when_pcb_present)
-            if performed:
-                logger.info("[자동검사] 검사 완료 — 다음 감시까지 %.1f초 대기", _auto_interval)
-                await asyncio.sleep(_auto_interval)
-                continue
-        except Exception as e:
-            logger.error("[자동검사] 파이프라인 오류: %s", e)
-
-        if _auto_running:
-            await asyncio.sleep(idle_poll_seconds)
+    return auto_status()

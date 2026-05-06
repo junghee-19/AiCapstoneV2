@@ -60,6 +60,8 @@ from models.schemas import (
     InspectionPacket,
     InspectionResult,
 )
+from runtime.inspection_control import stop_auto_inspection
+from ws.client import run_edge_ws_client
 
 # ── 로깅 설정 ─────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -210,6 +212,8 @@ sender:           Optional[ServerSender]   = None
 board_id_detector: Optional[YoloDetector] = None
 board_profiles: dict[str, dict[str, Any]] = {}
 board_detector_cache: dict[str, YoloDetector] = {}
+ws_stop_event: Optional[asyncio.Event] = None
+ws_task: Optional[asyncio.Task[None]] = None
 
 
 def _resolve_edge_relative_path(path_like: str) -> Path:
@@ -294,7 +298,7 @@ async def lifespan(app: FastAPI):
     - GPIO 핀 안전 초기화
     - HTTP 세션 종료
     """
-    global camera, detector, sender, board_id_detector, board_profiles
+    global camera, detector, sender, board_id_detector, board_profiles, ws_stop_event, ws_task
     logger.info("=" * 60)
     logger.info("   PCB 비전 검사 스테이션 시작 [%s]", settings.ENVIRONMENT.upper())
     logger.info("=" * 60)
@@ -327,12 +331,24 @@ async def lifespan(app: FastAPI):
     # HTTP 송신 세션 준비
     sender = ServerSender()
     logger.info("[시작] 서버 연결 준비 완료: %s", settings.SERVER_BASE_URL)
+    ws_stop_event = asyncio.Event()
+    ws_task = asyncio.create_task(run_edge_ws_client(ws_stop_event), name="edge-server-ws")
+    logger.info("[시작] 서버 WebSocket 제어 루프 준비 완료")
     logger.info("[시작] 초기화 완료 — 검사 대기 중")
 
     yield  # ← FastAPI 앱이 여기서 실행된다.
 
     # ── 종료 시 자원 정리 ─────────────────────────────────────────────────────
     logger.info("[종료] 자원 해제 시작...")
+    await stop_auto_inspection()
+    if ws_stop_event is not None:
+        ws_stop_event.set()
+    if ws_task is not None and not ws_task.done():
+        ws_task.cancel()
+        try:
+            await ws_task
+        except asyncio.CancelledError:
+            pass
     if camera:
         camera.release()
     if sender:
