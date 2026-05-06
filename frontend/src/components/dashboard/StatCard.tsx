@@ -98,6 +98,9 @@ export default function StatCardGroup() {
     )
   }
 
+  const skippedCount = stats.skippedCount ?? 0
+  const inspectedCount = stats.inspectedCount ?? (stats.passCount + stats.failCount)
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard
@@ -105,21 +108,21 @@ export default function StatCardGroup() {
         value={stats.totalCount.toLocaleString()}
         icon={Activity}
         theme="indigo"
-        caption="누적 검사 건수"
+        caption={`판정 생략 ${skippedCount.toLocaleString()}건`}
       />
       <StatCard
         title="합격 (PASS)"
         value={stats.passCount.toLocaleString()}
         icon={CheckCircle}
         theme="green"
-        caption={`전체의 ${(100 - stats.failRate).toFixed(1)}%`}
+        caption={`유효 검사 대비 ${(100 - stats.failRate).toFixed(1)}%`}
       />
       <StatCard
         title="불합격 (FAIL)"
         value={stats.failCount.toLocaleString()}
         icon={XCircle}
         theme="red"
-        caption={`전체의 ${stats.failRate.toFixed(1)}%`}
+        caption={`유효 검사 대비 ${stats.failRate.toFixed(1)}%`}
       />
       <StatCard
         title="불량률"
@@ -127,7 +130,7 @@ export default function StatCardGroup() {
         icon={AlertTriangle}
         /* 불량률 3% 이상이면 빨간색, 미만이면 노란색 */
         theme={stats.failRate >= 3 ? 'red' : 'yellow'}
-        caption="FAIL / 전체 검사"
+        caption={`FAIL / 유효 검사 ${inspectedCount.toLocaleString()}건`}
       />
     </div>
   )

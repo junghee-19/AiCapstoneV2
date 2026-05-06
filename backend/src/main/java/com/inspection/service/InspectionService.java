@@ -13,9 +13,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
+import java.time.temporal.WeekFields;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -150,7 +158,9 @@ public class InspectionService {
      * - totalCount: 전체 검사 건수
      * - passCount:  합격 건수
      * - failCount:  불합격 건수
-     * - failRate:   불량률 (0.0 ~ 1.0)
+     * - skippedCount: 판정 생략 건수
+     * - inspectedCount: 실제 판정 건수(PASS + FAIL)
+     * - failRate:   불량률 (FAIL / (PASS + FAIL))
      *
      * @return 통계 집계 Map
      */
@@ -159,14 +169,122 @@ public class InspectionService {
         long total = inspectionLogRepository.count();
         long pass  = inspectionLogRepository.countByResult(InspectionResult.PASS);
         long fail  = inspectionLogRepository.countByResult(InspectionResult.FAIL);
-        double failRate = (total > 0) ? (double) fail / total : 0.0;
+        long skipped = inspectionLogRepository.countByResult(InspectionResult.SKIPPED);
+        long inspected = pass + fail;
+        double failRate = (inspected > 0) ? (double) fail / inspected : 0.0;
 
         return Map.of(
                 "totalCount", total,
                 "passCount",  pass,
                 "failCount",  fail,
+                "skippedCount", skipped,
+                "inspectedCount", inspected,
                 "failRate",   Math.round(failRate * 10000.0) / 100.0  // 소수점 2자리 %
         );
+    }
+
+    /**
+     * 주별/월별 오류율 추이를 집계한다.
+     *
+     * @param groupBy week 또는 month
+     * @param periods 최근 N개 구간
+     * @return 기간별 집계 결과 목록
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getFailRateTrend(String groupBy, int periods) {
+        List<InspectionLog> logs = inspectionLogRepository.findAll().stream()
+                .sorted(Comparator.comparing(InspectionLog::getInspectedAt))
+                .toList();
+
+        LinkedHashMap<String, Bucket> buckets = "week".equalsIgnoreCase(groupBy)
+                ? initWeeklyBuckets(periods)
+                : initMonthlyBuckets(periods);
+
+        for (InspectionLog log : logs) {
+            String key = "week".equalsIgnoreCase(groupBy)
+                    ? weeklyKey(log.getInspectedAt().toLocalDate())
+                    : monthlyKey(log.getInspectedAt().toLocalDate());
+
+            Bucket bucket = buckets.get(key);
+            if (bucket == null) {
+                continue;
+            }
+
+            switch (log.getResult()) {
+                case PASS -> bucket.passCount++;
+                case FAIL -> bucket.failCount++;
+                case SKIPPED -> bucket.skippedCount++;
+            }
+        }
+
+        List<Map<String, Object>> trend = new ArrayList<>();
+        for (Map.Entry<String, Bucket> entry : buckets.entrySet()) {
+            Bucket bucket = entry.getValue();
+            long inspected = bucket.passCount + bucket.failCount;
+            double failRate = inspected > 0 ? (double) bucket.failCount / inspected : 0.0;
+
+            trend.add(Map.of(
+                    "key", entry.getKey(),
+                    "label", bucket.label,
+                    "passCount", bucket.passCount,
+                    "failCount", bucket.failCount,
+                    "skippedCount", bucket.skippedCount,
+                    "inspectedCount", inspected,
+                    "totalCount", inspected + bucket.skippedCount,
+                    "failRate", Math.round(failRate * 10000.0) / 100.0
+            ));
+        }
+
+        return trend;
+    }
+
+    private LinkedHashMap<String, Bucket> initMonthlyBuckets(int periods) {
+        LinkedHashMap<String, Bucket> buckets = new LinkedHashMap<>();
+        LocalDate current = LocalDate.now().withDayOfMonth(1);
+
+        for (int i = periods - 1; i >= 0; i--) {
+            LocalDate target = current.minusMonths(i);
+            String key = monthlyKey(target);
+            String label = String.format("%d월", target.getMonthValue());
+            buckets.put(key, new Bucket(label));
+        }
+        return buckets;
+    }
+
+    private LinkedHashMap<String, Bucket> initWeeklyBuckets(int periods) {
+        LinkedHashMap<String, Bucket> buckets = new LinkedHashMap<>();
+        LocalDate currentWeek = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+        for (int i = periods - 1; i >= 0; i--) {
+            LocalDate target = currentWeek.minusWeeks(i);
+            String key = weeklyKey(target);
+            int week = target.get(WeekFields.of(Locale.KOREA).weekOfWeekBasedYear());
+            String label = week + "주차";
+            buckets.put(key, new Bucket(label));
+        }
+        return buckets;
+    }
+
+    private String monthlyKey(LocalDate date) {
+        return String.format("%d-%02d", date.getYear(), date.getMonthValue());
+    }
+
+    private String weeklyKey(LocalDate date) {
+        WeekFields weekFields = WeekFields.of(Locale.KOREA);
+        int weekBasedYear = date.get(weekFields.weekBasedYear());
+        int week = date.get(weekFields.weekOfWeekBasedYear());
+        return String.format("%d-W%02d", weekBasedYear, week);
+    }
+
+    private static final class Bucket {
+        private final String label;
+        private long passCount;
+        private long failCount;
+        private long skippedCount;
+
+        private Bucket(String label) {
+            this.label = label;
+        }
     }
 
     /**

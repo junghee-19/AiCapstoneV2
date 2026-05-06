@@ -25,6 +25,7 @@ import asyncio
 from collections import Counter
 import json
 import logging
+import math
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -77,6 +78,129 @@ def _fiducial_confidences(alignment: AlignmentResult) -> tuple[Optional[float], 
     f1 = float(alignment.fiducial1.confidence) if alignment.fiducial1 else None
     f2 = float(alignment.fiducial2.confidence) if alignment.fiducial2 else None
     return f1, f2
+
+
+def _save_frame(frame: np.ndarray, save_dir: Optional[Path] = None) -> str:
+    """메모리 프레임을 captures 아래에 저장하고 절대 경로를 반환한다."""
+    base = save_dir if save_dir is not None else CAPTURES_DIR
+    base.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    file_path = base / f"{timestamp}.jpg"
+    cv2.imwrite(str(file_path), frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    logger.info("[카메라] 이미지 저장: %s", file_path)
+    return str(file_path)
+
+
+def _stage1_detector() -> Optional[YoloDetector]:
+    """현재 설정에 맞는 Stage 1 피듀셜 탐지기 반환."""
+    return fiducial_detector if settings.USE_SEPARATE_MODELS else detector
+
+
+async def _wait_for_centered_stable_pcb_frame() -> tuple[np.ndarray, str, list, int, AlignmentResult]:
+    """
+    PCB가 화면 중앙에 들어오고 일정 시간 거의 움직이지 않을 때까지 대기한 뒤 캡처한다.
+
+    판단 기준:
+    - 피듀셜 2개 검출
+    - 화면 중심 근처
+    - 직전 유효 프레임 대비 중점/간격/각도 변화가 허용치 이하
+    - 위 상태가 CAMERA_STABLE_HOLD_SEC 동안 연속 유지
+
+    타임아웃 시에는 최신 유효 프레임으로 강제 진행한다.
+    """
+    if camera is None:
+        raise RuntimeError("카메라가 초기화되지 않았습니다.")
+
+    stage1 = _stage1_detector()
+    if stage1 is None:
+        raise RuntimeError("Stage 1 탐지기가 로드되지 않았습니다.")
+
+    timeout_deadline = time.perf_counter() + settings.CAMERA_STABLE_WAIT_TIMEOUT_SEC
+    stable_since: Optional[float] = None
+    last_signature: Optional[tuple[float, float, float, float]] = None
+    latest_valid: Optional[tuple[np.ndarray, list, int, AlignmentResult]] = None
+
+    logger.info(
+        "[캡처대기] 중앙 + 안정 상태 대기 시작 (hold=%.1fs, timeout=%.1fs)",
+        settings.CAMERA_STABLE_HOLD_SEC,
+        settings.CAMERA_STABLE_WAIT_TIMEOUT_SEC,
+    )
+
+    while True:
+        frame = camera.capture()
+        fiducials, fiducial_ms = _stage1_detector().detect_fiducials(frame)
+        alignment = compute_alignment(fiducials)
+
+        if alignment.fiducial1 is not None and alignment.fiducial2 is not None:
+            h, w = frame.shape[:2]
+            center_x = (alignment.fiducial1.center_x + alignment.fiducial2.center_x) / 2.0
+            center_y = (alignment.fiducial1.center_y + alignment.fiducial2.center_y) / 2.0
+            span_px = math.hypot(
+                alignment.fiducial2.center_x - alignment.fiducial1.center_x,
+                alignment.fiducial2.center_y - alignment.fiducial1.center_y,
+            )
+            signature = (center_x, center_y, span_px, float(alignment.angle_error_deg))
+            latest_valid = (frame, fiducials, fiducial_ms, alignment)
+
+            center_dx = abs(center_x - (w / 2.0))
+            center_dy = abs(center_y - (h / 2.0))
+            centered = (
+                center_dx <= (w * settings.CAMERA_CENTER_TOLERANCE_RATIO)
+                and center_dy <= (h * settings.CAMERA_CENTER_TOLERANCE_RATIO)
+            )
+
+            stable_motion = False
+            if last_signature is not None:
+                prev_cx, prev_cy, prev_span, prev_angle = last_signature
+                stable_motion = (
+                    abs(center_x - prev_cx) <= settings.CAMERA_STABLE_CENTER_DELTA_PX
+                    and abs(center_y - prev_cy) <= settings.CAMERA_STABLE_CENTER_DELTA_PX
+                    and abs(span_px - prev_span) <= settings.CAMERA_STABLE_SPAN_DELTA_PX
+                    and abs(float(alignment.angle_error_deg) - prev_angle) <= settings.CAMERA_STABLE_ANGLE_DELTA_DEG
+                )
+
+            if alignment.is_aligned and centered and (stable_motion or stable_since is None):
+                if stable_since is None:
+                    stable_since = time.perf_counter()
+                    logger.info(
+                        "[캡처대기] 안정 후보 시작 — center=(%.0f,%.0f), span=%.1fpx, angle=%.2f°",
+                        center_x,
+                        center_y,
+                        span_px,
+                        float(alignment.angle_error_deg),
+                    )
+
+                held_for = time.perf_counter() - stable_since
+                if held_for >= settings.CAMERA_STABLE_HOLD_SEC:
+                    image_path = _save_frame(frame)
+                    logger.info("[캡처대기] 안정 상태 %.2fs 유지 확인 — 캡처", held_for)
+                    return frame, image_path, fiducials, fiducial_ms, alignment
+            else:
+                if stable_since is not None:
+                    logger.info("[캡처대기] 안정 상태 해제 — 중심/움직임 조건 재대기")
+                stable_since = None
+
+            last_signature = signature
+        else:
+            if stable_since is not None:
+                logger.info("[캡처대기] 피듀셜 부족으로 안정 상태 해제")
+            stable_since = None
+            last_signature = None
+
+        if time.perf_counter() >= timeout_deadline:
+            if latest_valid is not None:
+                frame, fiducials, fiducial_ms, alignment = latest_valid
+                image_path = _save_frame(frame)
+                logger.warning("[캡처대기] 타임아웃 — 최신 유효 프레임으로 강제 캡처")
+                return frame, image_path, fiducials, fiducial_ms, alignment
+
+            logger.warning("[캡처대기] 타임아웃 — 유효 피듀셜 없이 최신 프레임 강제 캡처")
+            frame = camera.capture()
+            image_path = _save_frame(frame)
+            return frame, image_path, [], 0, compute_alignment([])
+
+        await asyncio.sleep(settings.CAMERA_STABLE_SAMPLE_INTERVAL_SEC)
 
 
 # ── 전역 싱글턴 객체 (앱 수명 주기 동안 유지) ─────────────────────────────────
@@ -228,7 +352,11 @@ app = FastAPI(
 # CORS 설정: 같은 LAN의 운영자 PC 브라우저에서 직접 접근 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 운영 환경에서는 특정 IP로 제한할 것
+    allow_origins=[
+        "https://ai-capstone-v2.vercel.app",
+        "https://ai-capstone-v2-junghee-19s-projects.vercel.app",
+        "https://deepsight.웹.한국",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -276,9 +404,12 @@ async def run_inspection_pipeline(stage2_source_mode: Optional[str] = None) -> O
 
     # ── 운영 환경: 실제 파이프라인 ───────────────────────────────────────────
     try:
-        # STEP 1: 카메라 캡처
-        logger.info("[파이프라인] STEP 1 — 이미지 캡처")
-        frame, image_path = camera.capture_and_save()
+        # STEP 1: 중앙 + 안정 상태 대기 후 이미지 캡처
+        logger.info("[파이프라인] STEP 1 — 중앙/안정 상태 확인 후 이미지 캡처")
+        if gpio:
+            gpio.signal_processing()  # 처리 중 LED 점멸
+
+        frame, image_path, fiducials, fiducial_ms, alignment = await _wait_for_centered_stable_pcb_frame()
 
         debug_imshow = settings.ENVIRONMENT == "development"
         mode = (stage2_source_mode or settings.STAGE2_SOURCE_MODE).strip().lower()
@@ -286,8 +417,10 @@ async def run_inspection_pipeline(stage2_source_mode: Optional[str] = None) -> O
             frame,
             image_path,
             pipeline_start,
-            stage2_source_mode=mode,
             debug_imshow=debug_imshow,
+            fiducials_precomputed=fiducials,
+            fiducial_ms_precomputed=fiducial_ms,
+            alignment_precomputed=alignment,
         )
 
     except Exception as e:
@@ -302,6 +435,9 @@ def _run_production_vision_pipeline(
     *,
     stage2_source_mode: str = "aligned",
     debug_imshow: bool = False,
+    fiducials_precomputed=None,
+    fiducial_ms_precomputed: Optional[int] = None,
+    alignment_precomputed: Optional[AlignmentResult] = None,
 ) -> Optional[InspectionPacket]:
     """카메라/파일 공통 — Stage 1·2 및 전송."""
     try:
@@ -372,9 +508,16 @@ def _run_production_vision_pipeline(
                     return packet
 
         # STEP 2-A: Stage 1 — 피듀셜 마크 탐지 및 정렬 검사
-        logger.info("[파이프라인] STEP 2-A — 피듀셜 마크 탐지")
-        fiducials, fiducial_ms = stage1_detector.detect_fiducials(frame)
-        alignment = compute_alignment(fiducials)
+        if fiducials_precomputed is None or fiducial_ms_precomputed is None or alignment_precomputed is None:
+            logger.info("[파이프라인] STEP 2-A — 피듀셜 마크 탐지")
+            stage1 = fiducial_detector if settings.USE_SEPARATE_MODELS else detector
+            fiducials, fiducial_ms = stage1.detect_fiducials(frame)
+            alignment = compute_alignment(fiducials)
+        else:
+            logger.info("[파이프라인] STEP 2-A — 사전 감지된 피듀셜 사용")
+            fiducials = fiducials_precomputed
+            fiducial_ms = fiducial_ms_precomputed
+            alignment = alignment_precomputed
 
         measured_skew_deg = alignment.angle_error_deg
 
@@ -389,6 +532,22 @@ def _run_production_vision_pipeline(
             f1x, f1y = alignment.fiducial1.center_x, alignment.fiducial1.center_y
         if alignment.fiducial2:
             f2x, f2y = alignment.fiducial2.center_x, alignment.fiducial2.center_y
+
+        if len(fiducials) < 2:
+            logger.info("[파이프라인] PCB/피듀셜 미검출 → SKIPPED, Stage 2 건너뜀")
+            f1c, f2c = _fiducial_confidences(alignment)
+            packet = _build_packet(
+                result=InspectionResult.SKIPPED,
+                f1x=f1x, f1y=f1y, f2x=f2x, f2y=f2y,
+                f1_conf=f1c, f2_conf=f2c,
+                angle_error=measured_skew_deg,
+                inference_ms=fiducial_ms,
+                defects=[],
+                image_path=image_path,
+                pipeline_start=pipeline_start,
+            )
+            _finalize(packet)
+            return packet
 
         if not alignment.is_aligned:
             logger.warning("[파이프라인] 피듀셜/기울기 조건 불충족 → FAIL, Stage 2 건너뜀")
@@ -616,6 +775,52 @@ def _build_packet(
         inspected_at=datetime.now(),
         defects=defects,
     )
+
+
+def run_inspection_pipeline_when_pcb_present() -> bool:
+    """
+    자동 검사 전용:
+    라이브 프레임에서 PCB(피듀셜 2개)가 보일 때만 이미지를 저장하고 본검사를 실행한다.
+
+    Returns:
+        실제 검사까지 수행했으면 True, PCB 미검출로 건너뛰었으면 False.
+    """
+    if camera is None:
+        logger.debug("[자동검사] 카메라가 없어 PCB 감지를 건너뜁니다.")
+        return False
+
+    has_models = (
+        (fiducial_detector is not None and defect_detector is not None)
+        if settings.USE_SEPARATE_MODELS
+        else detector is not None
+    )
+    if not has_models:
+        logger.warning("[자동검사] YOLO 모델이 로드되지 않아 PCB 감지를 건너뜁니다.")
+        return False
+
+    pipeline_start = time.perf_counter()
+    frame = camera.capture()
+    stage1 = fiducial_detector if settings.USE_SEPARATE_MODELS else detector
+    fiducials, fiducial_ms = stage1.detect_fiducials(frame)
+
+    if len(fiducials) < 2:
+        logger.debug("[자동검사] PCB 미감지 — 피듀셜 %d개", len(fiducials))
+        return False
+
+    alignment = compute_alignment(fiducials)
+    image_path = _save_frame(frame)
+
+    logger.info("[자동검사] PCB 감지 — 본검사 시작")
+    _run_production_vision_pipeline(
+        frame,
+        image_path,
+        pipeline_start,
+        debug_imshow=False,
+        fiducials_precomputed=fiducials,
+        fiducial_ms_precomputed=fiducial_ms,
+        alignment_precomputed=alignment,
+    )
+    return True
 
 
 def _finalize(packet: InspectionPacket) -> None:

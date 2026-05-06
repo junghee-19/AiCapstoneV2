@@ -20,7 +20,7 @@ export interface DefectDetail {
 // ── 검사 이력 ─────────────────────────────────────────────────────────────────
 
 /** 최종 판정 결과 타입 */
-export type InspectionResultType = 'PASS' | 'FAIL'
+export type InspectionResultType = 'PASS' | 'FAIL' | 'SKIPPED'
 
 /** 검사 이력 단건 레코드 (GET /api/inspections 응답 요소) */
 export interface InspectionLog {
@@ -65,9 +65,22 @@ export interface InspectionLog {
 /** GET /api/inspections/stats 응답 */
 export interface InspectionStats {
   totalCount: number   // 전체 검사 건수
+  inspectedCount: number // 실제 판정 건수 (PASS + FAIL)
   passCount:  number   // 합격 건수
   failCount:  number   // 불합격 건수
+  skippedCount: number // 판정 생략 건수
   failRate:   number   // 불량률 (0.0 ~ 100.0, %)
+}
+
+export interface FailRateTrendPoint {
+  key: string
+  label: string
+  totalCount: number
+  inspectedCount: number
+  passCount: number
+  failCount: number
+  skippedCount: number
+  failRate: number
 }
 
 // ── 차트용 파생 타입 ──────────────────────────────────────────────────────────

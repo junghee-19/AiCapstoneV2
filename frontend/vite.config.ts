@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const apiProxyTarget =
     env.VITE_API_PROXY_TARGET?.trim() || 'http://localhost:8080'
   const edgeCaptureUrl =
-    env.VITE_EDGE_CAPTURE_URL?.trim() || 'http://192.168.0.7:8000'
+    env.VITE_EDGE_CAPTURE_URL?.trim() || 'http://localhost:8000'
 
   const devProxy = {
     '/api': {

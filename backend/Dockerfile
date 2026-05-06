@@ -11,8 +11,8 @@ WORKDIR /app
 
 COPY --from=builder /app/target/*.jar app.jar
 
-# compose와 같은 네트워크에서 mysql 호스트명 사용 (application-docker.yml)
-ENV SPRING_PROFILES_ACTIVE=docker
+# 프로필은 런타임 환경변수로 지정 (compose=docker, Railway=prod)
+# 미지정 시 기본 application.yml 사용
 
 EXPOSE 8080
 

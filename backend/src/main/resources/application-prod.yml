@@ -1,0 +1,19 @@
+# 운영 환경 (Railway 등 외부 호스팅) 설정
+# DB 연결정보는 Railway가 주입하는 SPRING_DATASOURCE_* 환경변수로 설정한다.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update          # 첫 배포 시 update, 이후 validate 권장
+    show-sql: false              # 운영: SQL 로그 끔
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+logging:
+  level:
+    com.inspection: INFO
+    org.springframework.web: WARN
+
+server:
+  port: ${PORT:8080}             # Railway는 PORT 환경변수로 포트 주입

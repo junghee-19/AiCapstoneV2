@@ -5,6 +5,7 @@ package com.inspection.domain.enums;
  *
  * <p>PASS: 피듀셜 마크 정렬 및 결함 탐지 모두 이상 없음
  * <p>FAIL: 정렬 오차 초과 또는 결함(단선/까짐) 탐지됨
+ * <p>SKIPPED: PCB/피듀셜이 충분히 잡히지 않아 판정을 건너뜀
  *
  * <p>DB 저장 시 EnumType.STRING으로 "PASS" / "FAIL" 문자열로 저장하여
  * 가독성과 마이그레이션 안전성을 높인다.
@@ -15,5 +16,8 @@ public enum InspectionResult {
     PASS,
 
     /** 불합격: 하나 이상의 검사 항목 실패 */
-    FAIL
+    FAIL,
+
+    /** 판정 생략: PCB 또는 피듀셜 미검출 */
+    SKIPPED
 }

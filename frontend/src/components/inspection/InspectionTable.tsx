@@ -20,15 +20,17 @@ import DefectViewer from './DefectViewer'
 
 // ── 보조 컴포넌트 ─────────────────────────────────────────────────────────────
 
-/** PASS / FAIL 결과 뱃지 */
-function ResultBadge({ result }: { result: 'PASS' | 'FAIL' }) {
+/** PASS / FAIL / SKIPPED 결과 뱃지 */
+function ResultBadge({ result }: { result: 'PASS' | 'FAIL' | 'SKIPPED' }) {
   return (
     <span
       className={clsx(
         'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold',
         result === 'PASS'
           ? 'bg-green-500/15 text-green-400 ring-1 ring-green-500/30'
-          : 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30'
+          : result === 'FAIL'
+            ? 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30'
+            : 'bg-slate-500/15 text-slate-300 ring-1 ring-slate-500/30'
       )}
     >
       {result}
@@ -131,7 +133,7 @@ interface InspectionTableProps {
   /** 데이터 로딩 중 여부 */
   isLoading?: boolean
   /** 결과 필터 (undefined이면 전체 표시) */
-  resultFilter?: 'PASS' | 'FAIL' | undefined
+  resultFilter?: 'PASS' | 'FAIL' | 'SKIPPED' | undefined
 }
 
 export default function InspectionTable({

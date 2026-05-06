@@ -19,6 +19,7 @@ class InspectionResult(str, Enum):
     """최종 검사 판정 결과. str 상속으로 JSON 직렬화 시 문자열로 자동 변환."""
     PASS = "PASS"
     FAIL = "FAIL"
+    SKIPPED = "SKIPPED"
 
 
 class DefectType(str, Enum):

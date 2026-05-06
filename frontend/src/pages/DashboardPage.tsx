@@ -12,37 +12,32 @@
  * └──────────────────────────────────────────────────┘
  */
 
-import { useEffect, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Camera, Loader2, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Camera, FolderOpen, Loader2, Trash2, X } from 'lucide-react'
 import StatCardGroup from '@/components/dashboard/StatCard'
 import PassFailChart from '@/components/dashboard/PassFailChart'
+import FailRateTrendChart from '@/components/dashboard/FailRateTrendChart'
 import TrendChart from '@/components/dashboard/TrendChart'
 import InspectionTable from '@/components/inspection/InspectionTable'
 import { deleteAllInspections } from '@/api/inspectionApi'
 import {
-  fetchCameraFocus,
+  getEdgeCameraStreamUrl,
   triggerEdgeInspection,
-  updateCameraFocus,
+  triggerInspectionFromUpload,
 } from '@/api/edgeApi'
 import { useRecentInspections } from '@/hooks/useInspectionData'
 
 export default function DashboardPage() {
   const queryClient = useQueryClient()
   const [actionMsg, setActionMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
-  const [focusAuto, setFocusAuto] = useState(false)
-  const [focusValue, setFocusValue] = useState(30)
-  const focusDebounceRef = useRef<number | null>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [showCameraPreview, setShowCameraPreview] = useState(false)
+  const [streamNonce, setStreamNonce] = useState(0)
 
   /* 최근 15건 — 대시보드 하단 실시간 피드 테이블 */
   const { data: recentLogs = [], isLoading } = useRecentInspections(15)
-  const livePreviewSrc = '/edge/camera/stream.mjpg'
-
-  const cameraFocusQuery = useQuery({
-    queryKey: ['camera-focus'],
-    queryFn: fetchCameraFocus,
-    refetchOnWindowFocus: false,
-  })
+  const cameraStreamUrl = `${getEdgeCameraStreamUrl()}?t=${streamNonce}`
 
   const invalidateInspections = () => {
     queryClient.invalidateQueries({ queryKey: ['inspections'] })
@@ -52,8 +47,9 @@ export default function DashboardPage() {
     mutationFn: () => triggerEdgeInspection('aligned'),
     onSuccess: (data) => {
       setActionMsg({ type: 'ok', text: data.message })
+      invalidateInspections()
+      setTimeout(() => invalidateInspections(), 800)
       setTimeout(() => invalidateInspections(), 2500)
-      setTimeout(() => invalidateInspections(), 6000)
     },
     onError: (e: Error) => {
       setActionMsg({ type: 'err', text: e.message || '검사 트리거 실패' })
@@ -124,7 +120,7 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-lg font-bold text-white">실시간 대시보드</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            5초마다 자동 갱신 · 라즈베리파이 엣지 노드 연결 중
+            라즈베리파이 엣지 노드 연결 중 · PCB가 중앙에서 5초간 안정되면 자동 캡처
           </p>
         </div>
         <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0 min-w-[min(100%,280px)]">
@@ -133,6 +129,8 @@ export default function DashboardPage() {
             type="button"
             onClick={() => {
               setActionMsg(null)
+              setShowCameraPreview(true)
+              setStreamNonce(Date.now())
               triggerMutation.mutate()
             }}
             disabled={triggerMutation.isPending}
@@ -174,74 +172,51 @@ export default function DashboardPage() {
         </p>
       )}
 
-      {/* 실시간 카메라 프리뷰 */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-300">실시간 웹캠 프리뷰</h3>
-          <span className="text-[11px] text-gray-500">MJPEG 실시간 스트림</span>
-        </div>
-        <div className="mb-3 rounded-lg border border-gray-800 bg-gray-950/50 p-3">
-          <div className="flex flex-wrap items-center gap-3 justify-between">
-            <label className="inline-flex items-center gap-2 text-xs text-gray-300">
-              <input
-                type="checkbox"
-                checked={focusAuto}
-                onChange={(e) => {
-                  const next = e.target.checked
-                  setFocusAuto(next)
-                  focusMutation.mutate({ auto: next, value: focusValue })
-                }}
-                className="accent-indigo-500"
-                disabled={focusMutation.isPending && !focusAuto}
-              />
-              오토포커스
-            </label>
-            <span className="text-[11px] text-gray-500">
-              {focusAuto ? '자동 초점 사용 중' : `수동 초점값: ${focusValue}`}
-            </span>
+      {showCameraPreview && (
+        <section className="rounded-2xl border border-gray-800 bg-gray-950/80 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-800">
+            <div>
+              <h3 className="text-sm font-semibold text-white">라즈베리 카메라 실시간 화면</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                PCB가 화면 중앙에서 5초간 거의 움직이지 않으면 자동 캡처됩니다. 현재 추론 결과 박스 오버레이는 포함되지 않습니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCameraPreview(false)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 transition-colors"
+            >
+              <X size={14} />
+              닫기
+            </button>
           </div>
-          <div className="mt-3">
-            <input
-              type="range"
-              min={0}
-              max={255}
-              step={1}
-              value={focusValue}
-              disabled={focusAuto}
-              onChange={(e) => {
-                const next = Number(e.target.value)
-                setFocusValue(next)
-                scheduleManualFocusUpdate(next)
-              }}
-              className="w-full accent-indigo-500 disabled:opacity-40"
-            />
-            <div className="mt-1 flex items-center justify-between text-[10px] text-gray-500">
-              <span>0</span>
-              <span>127</span>
-              <span>255</span>
+          <div className="p-4">
+            <div className="relative w-full overflow-hidden rounded-xl border border-gray-800 bg-black">
+              <img
+                src={cameraStreamUrl}
+                alt="라즈베리 카메라 실시간 스트림"
+                className="block w-full aspect-video object-cover bg-black"
+                onError={() => {
+                  setActionMsg({
+                    type: 'err',
+                    text: '라즈베리 카메라 스트림을 불러오지 못했습니다. edge 서버와 카메라 상태를 확인하세요.',
+                  })
+                }}
+              />
+              <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-1 text-[11px] font-medium text-emerald-300 backdrop-blur-sm">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                LIVE CAMERA
+              </div>
             </div>
           </div>
-          {(cameraFocusQuery.isLoading || focusMutation.isPending) && (
-            <p className="mt-2 text-[11px] text-gray-500">초점 설정 동기화 중...</p>
-          )}
-        </div>
-        <div className="w-full aspect-video rounded-lg overflow-hidden bg-black/70 border border-gray-800">
-          <img
-            src={livePreviewSrc}
-            alt="라즈베리파이 카메라 실시간 프리뷰"
-            className="w-full h-full object-contain"
-            onError={() => {
-              // 네트워크 끊김/엣지 미가동 시 다음 tick 에 자동 재시도
-            }}
-          />
-        </div>
-      </div>
+        </section>
+      )}
 
       {/* 1행: 통계 카드 4개 */}
       <StatCardGroup />
 
       {/* 2행: 도넛 차트 + 트렌드 차트 */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
         {/* PassFailChart: 2/5 너비 */}
         <div className="lg:col-span-2">
           <PassFailChart />
@@ -250,6 +225,10 @@ export default function DashboardPage() {
         <div className="lg:col-span-3">
           <TrendChart />
         </div>
+      </div>
+
+      <div>
+        <FailRateTrendChart />
       </div>
 
       {/* 3행: 실시간 이력 테이블 */}

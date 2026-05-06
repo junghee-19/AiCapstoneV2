@@ -40,9 +40,9 @@ public class InspectionRequestDto {
     @NotBlank(message = "디바이스 ID는 필수입니다.")
     private String deviceId;
 
-    /** 최종 판정 결과 문자열 ("PASS" 또는 "FAIL") */
+    /** 최종 판정 결과 문자열 ("PASS" / "FAIL" / "SKIPPED") */
     @NotBlank(message = "판정 결과는 필수입니다.")
-    @Pattern(regexp = "PASS|FAIL", message = "결과는 PASS 또는 FAIL이어야 합니다.")
+    @Pattern(regexp = "PASS|FAIL|SKIPPED", message = "결과는 PASS, FAIL 또는 SKIPPED이어야 합니다.")
     private String result;
 
     // ── 피듀셜 마크 좌표 (마크를 찾지 못한 경우 null 허용) ───────────────────

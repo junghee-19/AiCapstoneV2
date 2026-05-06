@@ -57,8 +57,8 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { name
   if (!active || !payload?.length) return null
   const { name, value } = payload[0]
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-xl">
-      <span className="text-gray-300">{name}: </span>
+    <div className="rounded-lg border border-white/10 bg-[#10141b] px-3 py-2 text-xs shadow-xl">
+      <span className="text-slate-300">{name}: </span>
       <span className="text-white font-bold">{value.toLocaleString()}건</span>
     </div>
   )
@@ -72,8 +72,8 @@ export default function PassFailChart() {
   /* 로딩 스켈레톤 */
   if (isLoading || !stats) {
     return (
-      <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 flex items-center justify-center h-72 animate-pulse">
-        <div className="w-48 h-48 rounded-full bg-gray-800" />
+      <div className="flex h-80 items-center justify-center rounded-[20px] border border-white/5 bg-[#171b22] p-6 animate-pulse">
+        <div className="h-52 w-52 rounded-full bg-white/10" />
       </div>
     )
   }
@@ -85,18 +85,27 @@ export default function PassFailChart() {
   ]
 
   return (
-    <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
-      <h2 className="text-sm font-semibold text-gray-300 mb-4">합격 / 불합격 비율</h2>
+    <div className="h-80 overflow-hidden rounded-[20px] border border-white/5 bg-[#171b22] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-white">Inspection Outcome</h2>
+          <p className="mt-1 text-xs text-slate-500">누적 PASS/FAIL 비율</p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-lg bg-black/10 px-2 py-1 text-xs text-slate-400">
+          <span className="h-2 w-2 rounded-full bg-pass" />
+          실시간 누적
+        </div>
+      </div>
 
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={232}>
         <PieChart>
           <Pie
             data={pieData}
             cx="50%"
-            cy="50%"
+            cy="46%"
             /* innerRadius > 0 → 도넛(Donut) 형태 */
-            innerRadius={72}
-            outerRadius={100}
+            innerRadius={60}
+            outerRadius={80}
             paddingAngle={3}
             dataKey="value"
             /* 중앙 레이블: 커스텀 SVG 컴포넌트 */
@@ -113,10 +122,12 @@ export default function PassFailChart() {
           {/* 마우스 호버 툴팁 */}
           <Tooltip content={<CustomTooltip />} />
 
-          {/* 범례 */}
           <Legend
+            verticalAlign="bottom"
+            iconType="circle"
+            wrapperStyle={{ paddingTop: '6px' }}
             formatter={(value) => (
-              <span style={{ color: '#d1d5db', fontSize: '0.75rem' }}>{value}</span>
+              <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>{value}</span>
             )}
           />
         </PieChart>

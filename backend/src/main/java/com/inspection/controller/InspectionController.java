@@ -29,12 +29,11 @@ import java.util.Map;
  * - GET    /api/inspections/period   → 기간 필터 조회
  * - DELETE /api/inspections          → 전체 이력 삭제 (대시보드)
  *
- * @CrossOrigin: React 개발 서버(localhost:5173)의 CORS 요청을 허용한다.
- *               운영 배포 시에는 특정 도메인으로 제한할 것.
+ * CORS는 {@link com.inspection.global.CorsConfig} 에서 전역 설정.
+ *   - 환경변수 CORS_ALLOWED_ORIGINS 로 허용 origin 목록 주입
  */
 @RestController
 @RequestMapping("/api/inspections")
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
 @Slf4j
 @RequiredArgsConstructor
 public class InspectionController {
@@ -126,6 +125,8 @@ public class InspectionController {
      *   "totalCount": 350,
      *   "passCount": 320,
      *   "failCount": 30,
+     *   "skippedCount": 8,
+     *   "inspectedCount": 350,
      *   "failRate": 8.57
      * }
      *
@@ -135,6 +136,23 @@ public class InspectionController {
     public ResponseEntity<Map<String, Object>> getStatsSummary() {
         log.debug("[GET /api/inspections/stats] 통계 조회");
         return ResponseEntity.ok(inspectionService.getStatsSummary());
+    }
+
+    /**
+     * 기간 단위 오류율 추이 조회
+     *
+     * <p>GET /api/inspections/stats/fail-rate-trend?groupBy=month&periods=6
+     *
+     * @param groupBy week 또는 month
+     * @param periods 최근 구간 수
+     * @return 200 OK + 기간별 오류율 추이
+     */
+    @GetMapping("/stats/fail-rate-trend")
+    public ResponseEntity<List<Map<String, Object>>> getFailRateTrend(
+            @RequestParam(defaultValue = "month") String groupBy,
+            @RequestParam(defaultValue = "6") @Min(1) int periods) {
+        log.debug("[GET /api/inspections/stats/fail-rate-trend] groupBy={}, periods={}", groupBy, periods);
+        return ResponseEntity.ok(inspectionService.getFailRateTrend(groupBy, periods));
     }
 
     /**

@@ -18,8 +18,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 import cv2
+import numpy as np
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -46,6 +47,69 @@ def _normalize_stage2_mode(stage2_source: Optional[str]) -> str:
 # ── 자동 연속 검사 상태 관리 ──────────────────────────────────────────────────
 _auto_running: bool = False       # 자동 검사 루프 실행 중 여부
 _auto_interval: float = 5.0      # 검사 간격 (초)
+
+
+def _draw_detection_overlay(frame: np.ndarray, fiducials: list[Any], alignment: Any) -> np.ndarray:
+    """실시간 스트림 프레임에 피듀셜/PCB 인식 가이드를 그린다."""
+    annotated = frame.copy()
+
+    for idx, item in enumerate(fiducials[:2], start=1):
+        x = int(item.bbox.x)
+        y = int(item.bbox.y)
+        w = int(item.bbox.width)
+        h = int(item.bbox.height)
+        cv2.rectangle(annotated, (x, y), (x + w, y + h), (0, 220, 255), 2)
+        cv2.putText(
+            annotated,
+            f"Fiducial {idx}",
+            (x, max(24, y - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 220, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+    if alignment.fiducial1 is not None and alignment.fiducial2 is not None:
+        from inference.alignment import crop_inspection_roi_with_offset
+
+        h, w = annotated.shape[:2]
+        _, roi_x, roi_y = crop_inspection_roi_with_offset(annotated, alignment)
+        b1 = alignment.fiducial1.bbox
+        b2 = alignment.fiducial2.bbox
+        roi_w = max(b1.x + b1.width, b2.x + b2.width) - min(b1.x, b2.x)
+        roi_h = max(b1.y + b1.height, b2.y + b2.height) - min(b1.y, b2.y)
+        pad_x = int(roi_w * 0.05)
+        pad_y = int(roi_h * 0.05)
+        x_min = max(0, roi_x)
+        y_min = max(0, roi_y)
+        x_max = min(w, x_min + roi_w + pad_x * 2)
+        y_max = min(h, y_min + roi_h + pad_y * 2)
+
+        cv2.rectangle(annotated, (x_min, y_min), (x_max, y_max), (80, 255, 120), 3)
+        cv2.putText(
+            annotated,
+            "PCB DETECTED",
+            (x_min, max(28, y_min - 10)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (80, 255, 120),
+            2,
+            cv2.LINE_AA,
+        )
+    else:
+        cv2.putText(
+            annotated,
+            "Searching PCB...",
+            (28, 42),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (0, 170, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+    return annotated
 
 
 # ── 상태 조회 ─────────────────────────────────────────────────────────────────
@@ -203,30 +267,88 @@ async def camera_preview_stream() -> StreamingResponse:
 
 # ── 수동 검사 트리거 ──────────────────────────────────────────────────────────
 
-@router.post("/inspect/trigger", summary="수동 검사 트리거")
-async def trigger_inspection(
-    background_tasks: BackgroundTasks,
-    stage2Source: Optional[str] = None,
-) -> dict[str, str]:
+@router.post("/inspect/trigger", summary="수동 검사 실행")
+async def trigger_inspection() -> dict[str, str]:
     """
     운영자가 HTTP 요청으로 즉시 검사를 한 번 실행하도록 트리거한다.
 
-    실제 검사 파이프라인은 main.py의 run_inspection_pipeline()을 호출하며,
-    BackgroundTasks로 비동기 실행하여 API 응답을 즉시 반환한다.
+    실제 검사 파이프라인은 main.py의 run_inspection_pipeline()을 직접 호출하며,
+    요청은 검사 완료 시점에 응답한다.
 
     Returns:
-        요청 수락 메시지 (실제 검사 결과는 서버 DB에서 확인)
+        검사 완료 메시지 (상세 결과는 서버 DB에서 확인)
     """
-    mode = _normalize_stage2_mode(stage2Source)
-    logger.info("[라우터] 수동 검사 트리거 요청 수신 (stage2=%s)", mode)
+    logger.info("[라우터] 수동 검사 실행 요청 수신")
 
     # main 모듈의 파이프라인을 지연 import (순환 참조 방지)
     try:
         from main import run_inspection_pipeline
-        background_tasks.add_task(run_inspection_pipeline, mode)
-        return {"message": f"검사가 백그라운드에서 시작되었습니다. (stage2={mode})"}
+
+        packet = await run_inspection_pipeline()
+        if packet is None:
+            raise HTTPException(status_code=500, detail="검사 실행 중 오류가 발생했습니다.")
+
+        return {"message": f"PCB가 중앙에서 5초간 안정된 뒤 검사 완료되었습니다. 결과: {packet.result.value}"}
     except ImportError:
         raise HTTPException(status_code=503, detail="검사 파이프라인을 로드할 수 없습니다.")
+
+
+@router.get("/camera/stream", summary="라즈베리 카메라 MJPEG 스트림")
+async def stream_camera() -> StreamingResponse:
+    """
+    브라우저에서 <img src> 로 바로 볼 수 있는 MJPEG 스트림.
+
+    현재 파이프라인은 단발 검사 중심이므로 이 스트림은 "실시간 카메라 프리뷰" 역할을 하며,
+    수동 검사와 같은 카메라 장치를 공유한다.
+    """
+    try:
+        import main as main_mod
+
+        cam = getattr(main_mod, "camera", None)
+        stage1 = (
+            getattr(main_mod, "fiducial_detector", None)
+            if settings.USE_SEPARATE_MODELS
+            else getattr(main_mod, "detector", None)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"카메라 상태 확인 실패: {e}") from e
+
+    if cam is None:
+        raise HTTPException(status_code=503, detail="카메라가 초기화되지 않았습니다.")
+    if stage1 is None:
+        raise HTTPException(status_code=503, detail="YOLO 모델이 초기화되지 않았습니다.")
+
+    async def frame_generator():
+        while True:
+            try:
+                frame = cam.capture()
+                from inference.alignment import compute_alignment
+
+                fiducials, _ = stage1.detect_fiducials(frame)
+                alignment = compute_alignment(fiducials)
+                annotated = _draw_detection_overlay(frame, fiducials, alignment)
+
+                ok, encoded = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if not ok:
+                    await asyncio.sleep(0.1)
+                    continue
+
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + encoded.tobytes()
+                    + b"\r\n"
+                )
+                await asyncio.sleep(0.12)
+            except Exception as e:
+                logger.warning("[카메라 스트림] 프레임 전송 실패: %s", e)
+                await asyncio.sleep(0.3)
+
+    return StreamingResponse(
+        frame_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
 
 
 _EDGE_ROOT = Path(__file__).resolve().parent.parent
@@ -513,16 +635,21 @@ async def auto_inspect_status() -> dict[str, Any]:
 async def _auto_inspect_loop() -> None:
     """
     자동 연속 검사 백그라운드 루프.
-    _auto_running 이 False가 될 때까지 interval마다 검사를 실행합니다.
+    라이브 프레임에서 PCB가 보일 때만 본검사를 수행합니다.
     """
     global _auto_running
+    idle_poll_seconds = 0.5
     while _auto_running:
         try:
-            from main import run_inspection_pipeline
-            logger.info("[자동검사] 검사 실행 중...")
-            await asyncio.get_event_loop().run_in_executor(None, run_inspection_pipeline)
+            from main import run_inspection_pipeline_when_pcb_present
+            logger.info("[자동검사] PCB 감시 중...")
+            performed = await asyncio.to_thread(run_inspection_pipeline_when_pcb_present)
+            if performed:
+                logger.info("[자동검사] 검사 완료 — 다음 감시까지 %.1f초 대기", _auto_interval)
+                await asyncio.sleep(_auto_interval)
+                continue
         except Exception as e:
             logger.error("[자동검사] 파이프라인 오류: %s", e)
 
         if _auto_running:
-            await asyncio.sleep(_auto_interval)
+            await asyncio.sleep(idle_poll_seconds)

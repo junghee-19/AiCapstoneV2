@@ -12,17 +12,20 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   fetchAllInspections,
+  fetchFailRateTrend,
   fetchInspectionById,
   fetchInspectionsByPeriod,
   fetchRecentInspections,
   fetchStats,
 } from '@/api/inspectionApi'
-import type { TrendDataPoint } from '@/types/inspection'
+import type { FailRateTrendPoint, TrendDataPoint } from '@/types/inspection'
 
 /** React Query 캐시 키 상수 — 오타 방지를 위해 중앙 관리 */
 export const QUERY_KEYS = {
   stats:        ['inspections', 'stats']         as const,
   all:          ['inspections', 'all']           as const,
+  failRateTrend: (groupBy: 'week' | 'month', periods: number) =>
+                  ['inspections', 'fail-rate-trend', groupBy, periods] as const,
   recent:       (limit: number) => ['inspections', 'recent', limit] as const,
   byId:         (id: number)    => ['inspections', id]              as const,
   byPeriod:     (from: string, to: string) =>
@@ -41,6 +44,15 @@ export function useStats() {
     queryFn:         fetchStats,
     refetchInterval: 5_000,   // 5초마다 자동 갱신
     staleTime:       3_000,   // 3초 이내 데이터는 fresh로 간주 (불필요한 재요청 방지)
+  })
+}
+
+export function useFailRateTrend(groupBy: 'week' | 'month', periods: number) {
+  return useQuery<FailRateTrendPoint[]>({
+    queryKey: QUERY_KEYS.failRateTrend(groupBy, periods),
+    queryFn: () => fetchFailRateTrend(groupBy, periods),
+    refetchInterval: 5_000,
+    staleTime: 3_000,
   })
 }
 
@@ -137,7 +149,7 @@ export function useTrendData(): { data: TrendDataPoint[]; isLoading: boolean } {
     if (!grouped[label]) grouped[label] = { pass: 0, fail: 0 }
 
     if (log.result === 'PASS') grouped[label].pass++
-    else                       grouped[label].fail++
+    else if (log.result === 'FAIL') grouped[label].fail++
   })
 
   // 시간 오름차순 정렬

@@ -120,6 +120,8 @@ export default function HistoryPage() {
   /* 필터 결과 미니 통계 */
   const passCount = filteredLogs.filter((l) => l.result === 'PASS').length
   const failCount = filteredLogs.filter((l) => l.result === 'FAIL').length
+  const skippedCount = filteredLogs.filter((l) => l.result === 'SKIPPED').length
+  const inspectedCount = passCount + failCount
 
   return (
     <div className="p-6 space-y-5 overflow-y-auto h-full">
@@ -180,6 +182,7 @@ export default function HistoryPage() {
             <FilterButton label="전체"  value="ALL"  current={resultFilter} count={allLogs.length}                        onClick={setResultFilter} />
             <FilterButton label="PASS"  value="PASS" current={resultFilter} count={allLogs.filter(l => l.result==='PASS').length} onClick={setResultFilter} />
             <FilterButton label="FAIL"  value="FAIL" current={resultFilter} count={allLogs.filter(l => l.result==='FAIL').length} onClick={setResultFilter} />
+            <FilterButton label="SKIPPED" value="SKIPPED" current={resultFilter} count={allLogs.filter(l => l.result==='SKIPPED').length} onClick={setResultFilter} />
           </div>
         </div>
       </div>
@@ -195,10 +198,13 @@ export default function HistoryPage() {
         <span>
           불합격: <span className="text-red-400 font-semibold">{failCount}건</span>
         </span>
-        {filteredLogs.length > 0 && (
+        <span>
+          생략: <span className="text-slate-300 font-semibold">{skippedCount}건</span>
+        </span>
+        {inspectedCount > 0 && (
           <span>
             불량률: <span className="text-yellow-400 font-semibold">
-              {((failCount / filteredLogs.length) * 100).toFixed(2)}%
+              {((failCount / inspectedCount) * 100).toFixed(2)}%
             </span>
           </span>
         )}
