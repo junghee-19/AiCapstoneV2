@@ -33,6 +33,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- ===== WebSocket: 엣지 디바이스 제어 채널 ===== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- ===== JPA: ORM 및 DB 자동 쿼리 생성 ===== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -17,6 +17,7 @@ pydantic-settings==2.2.1
 # ===== HTTP 통신 (서버로 결과 전송) =====
 requests==2.31.0
 httpx==0.27.0
+websockets==12.0
 
 # ===== 유틸리티 =====
 python-dotenv==1.0.1

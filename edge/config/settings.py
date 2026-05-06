@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     # ── 중앙 서버 연결 정보 ──────────────────────────────────────────────────
     # Spring Boot 서버 주소 (같은 LAN 내 IP 또는 hostname)
     SERVER_BASE_URL: str = Field(default="http://192.168.0.10:8080")
+    EDGE_DEVICE_ID: str = Field(default="RPI5-LINE-A")
+    # Spring Boot 서버가 edge 제어용 WebSocket endpoint를 열어두면 여기에 연결한다.
+    # EDGE_WS_URL이 비어 있으면 SERVER_BASE_URL + EDGE_WS_PATH에서 자동 생성한다.
+    EDGE_WS_ENABLED: bool = Field(default=True)
+    EDGE_WS_URL: Optional[str] = Field(default=None)
+    EDGE_WS_PATH: str = Field(default="/ws/edge")
+    EDGE_WS_RECONNECT_DELAY_SEC: float = Field(default=5.0, ge=0.5, le=120.0)
+    EDGE_WS_PING_INTERVAL_SEC: float = Field(default=20.0, ge=1.0, le=120.0)
+    EDGE_WS_PING_TIMEOUT_SEC: float = Field(default=20.0, ge=1.0, le=120.0)
 
     # ── 카메라 설정 ──────────────────────────────────────────────────────────
     # /dev/video0 → 0, C922가 video1·video2만 있으면 1 또는 2
@@ -62,6 +71,7 @@ class Settings(BaseSettings):
     # ── YOLO 추론 설정 ───────────────────────────────────────────────────────
     # 단일 통합 모델 (best.pt) 사용
     YOLO_WEIGHTS_PATH: str = Field(default="weights/best.pt")
+    USE_SEPARATE_MODELS: bool = Field(default=False)
 
     # 이 값 이상의 confidence (Stage 전용 값이 없을 때 피듀셜·결함 공통 기본)
     YOLO_CONFIDENCE_THRESHOLD: float = Field(default=0.5, ge=0.0, le=1.0)
