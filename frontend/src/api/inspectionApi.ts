@@ -1,5 +1,3 @@
-/// <reference types="vite/client" />
-
 import axios from 'axios'
 import type { FailRateTrendPoint, InspectionLog, InspectionStats } from '@/types/inspection'
 
@@ -81,18 +79,4 @@ export const fetchInspectionsByPeriod = async (
 
 export const deleteAllInspections = async (): Promise<void> => {
   await apiClient.delete('/inspections')
-}
-
-/**
- * 이미지 업로드 → Spring 백엔드 /api/inspections (multipart)
- * 백엔드가 inference-service로 forward → DB 저장 후 응답.
- */
-export const inspectImage = async (file: File): Promise<InspectionLog> => {
-  const formData = new FormData()
-  formData.append('image', file)
-
-  const { data } = await apiClient.post<InspectionLog>('/inspections', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return data
 }

@@ -1,0 +1,24 @@
+# ===== 웹 프레임워크 (로컬 API 서빙) =====
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# ===== 컴퓨터 비전 및 AI 추론 =====
+opencv-python==4.9.0.80
+ultralytics==8.2.18          # YOLOv8
+# PyTorch 2.6+는 torch.load 기본값 변경으로 ultralytics 8.2.18과 충돌 가능
+# 라즈베리파이에서 검증된 조합으로 고정
+torch==2.5.1
+torchvision==0.20.1
+
+# ===== 데이터 모델 및 검증 =====
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# ===== HTTP 통신 (서버로 결과 전송) =====
+requests==2.31.0
+httpx==0.27.0
+
+# ===== 유틸리티 =====
+python-dotenv==1.0.1
+numpy==1.26.4
+Pillow==10.3.0
