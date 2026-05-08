@@ -1,5 +1,3 @@
-/// <reference types="vite/client" />
-
 import axios from 'axios'
 import type { FailRateTrendPoint, InspectionLog, InspectionStats } from '@/types/inspection'
 

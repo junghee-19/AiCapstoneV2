@@ -28,26 +28,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/inspection_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: your_password
-      # inference-service 호출용 내부 URL (도커 네트워크 안에서 서비스명으로 접근)
-      INFERENCE_SERVICE_URL: http://inference-service:8000
       TZ: Asia/Seoul
     ports:
       - "8080:8080"
-
-  inference-service:
-    build:
-      context: ./inference-service
-    container_name: aicapstone-inference-service
-    environment:
-      TZ: Asia/Seoul
-      DEFECT_INFER_ON_FULL_DESKEW: "true"
-      YOLO_PREDICT_IMGSZ: "1024"
-      YOLO_DEFECT_CONFIDENCE_THRESHOLD: "0.15"
-    ports:
-      - "8000:8000"
-    volumes:
-      # 학습된 가중치를 외부에서 교체 가능하도록 마운트
-      - ./inference-service/weights:/app/weights
 
   frontend:
     build:
@@ -57,6 +40,9 @@ services:
       - backend
     environment:
       VITE_API_PROXY_TARGET: http://backend:8080
+      # 라즈베리파이에서 edge를 따로 실행할 때 사용할 주소
+      # 예) VITE_EDGE_CAPTURE_URL=http://192.168.0.23:8000
+      VITE_EDGE_CAPTURE_URL: ${VITE_EDGE_CAPTURE_URL}
     ports:
       - "5173:5173"
 
