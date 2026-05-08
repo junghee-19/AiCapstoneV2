@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl *)",
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8'\\).read\\(\\)\\) for p in ['main.py','models/schemas.py','inference/yolo_detector.py','inference/defect_crops.py','runtime/defect_alarm.py','config/settings.py']]; print\\('AST OK'\\)\")",
+      "Bash(docker --version)",
+      "Bash(docker info *)",
+      "Bash(docker build *)",
+      "Bash(tee /tmp/edge_build.log)",
+      "Bash(pip install *)",
+      "Bash(python *)",
+      "Bash(docker buildx *)",
+      "Bash(docker system *)",
+      "Bash(docker version *)"
+    ]
+  }
+}
