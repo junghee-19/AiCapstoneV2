@@ -209,6 +209,7 @@ async def _wait_for_centered_stable_pcb_frame() -> tuple[np.ndarray, str, list, 
 camera:           Optional[CameraCapture] = None
 detector:         Optional[YoloDetector]  = None  # 단일 모델 모드
 sender:           Optional[ServerSender]   = None
+gpio:             Any = None
 board_id_detector: Optional[YoloDetector] = None
 board_profiles: dict[str, dict[str, Any]] = {}
 board_detector_cache: dict[str, YoloDetector] = {}
@@ -389,12 +390,17 @@ app.mount("/demo_samples", StaticFiles(directory=str(DEMO_SAMPLES_DIR)), name="d
 
 # ── 2-Stage 비전 검사 파이프라인 ──────────────────────────────────────────────
 
-async def run_inspection_pipeline(stage2_source_mode: Optional[str] = None) -> Optional[InspectionPacket]:
+async def run_inspection_pipeline(
+    stage2_source_mode: Optional[str] = None,
+    *,
+    force_camera: bool = False,
+) -> Optional[InspectionPacket]:
     """
     PCB 검사 전체 파이프라인을 실행한다.
 
     개발(ENVIRONMENT=development) 환경:
         카메라/YOLO 없이 더미 데이터로 파이프라인 흐름을 테스트한다.
+        단, force_camera=True인 수동 트리거는 실제 카메라 캡처를 수행한다.
 
     운영(ENVIRONMENT=production) 환경:
         실제 카메라 캡처 → YOLO 추론 → GPIO 알람 → 서버 전송을 수행한다.
@@ -406,7 +412,22 @@ async def run_inspection_pipeline(stage2_source_mode: Optional[str] = None) -> O
     pipeline_start = time.perf_counter()
 
     # ── 개발 환경: 더미 모드 ─────────────────────────────────────────────────
-    if settings.ENVIRONMENT == "development" or camera is None:
+    if camera is None:
+        if force_camera:
+            logger.error("[파이프라인] 실제 카메라 검사 요청이지만 카메라가 초기화되지 않았습니다.")
+            return None
+        logger.info("[파이프라인] 카메라 없음 — 더미 모드 실행")
+        packet = create_dummy_packet()
+
+        # 서버 전송
+        if sender:
+            sender.send(packet)
+
+        total_ms = int((time.perf_counter() - pipeline_start) * 1000)
+        logger.info("[파이프라인] 더미 완료: %s (%dms)", packet.result.value, total_ms)
+        return packet
+
+    if settings.ENVIRONMENT == "development" and not force_camera:
         logger.info("[파이프라인] 더미 모드 실행")
         packet = create_dummy_packet()
 
@@ -427,12 +448,13 @@ async def run_inspection_pipeline(stage2_source_mode: Optional[str] = None) -> O
 
         frame, image_path, fiducials, fiducial_ms, alignment = await _wait_for_centered_stable_pcb_frame()
 
-        debug_imshow = settings.ENVIRONMENT == "development"
+        debug_imshow = settings.ENVIRONMENT == "development" and not force_camera
         mode = (stage2_source_mode or settings.STAGE2_SOURCE_MODE).strip().lower()
         return _run_production_vision_pipeline(
             frame,
             image_path,
             pipeline_start,
+            stage2_source_mode=mode,
             debug_imshow=debug_imshow,
             fiducials_precomputed=fiducials,
             fiducial_ms_precomputed=fiducial_ms,

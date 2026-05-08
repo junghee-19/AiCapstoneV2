@@ -30,7 +30,10 @@ async def trigger_inspection_once(stage2_source_mode: Optional[str] = None) -> I
         except ImportError as e:
             raise RuntimeError("검사 파이프라인을 로드할 수 없습니다.") from e
 
-        packet = await run_inspection_pipeline(stage2_source_mode=stage2_source_mode)
+        packet = await run_inspection_pipeline(
+            stage2_source_mode=stage2_source_mode,
+            force_camera=True,
+        )
         if packet is None:
             raise RuntimeError("검사 실행 중 오류가 발생했습니다.")
         return packet
