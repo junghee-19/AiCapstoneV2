@@ -381,11 +381,20 @@ app.add_middleware(
 # 엣지 라우터 등록 (/edge/health, /edge/inspect/dummy 등)
 app.include_router(edge_router)
 
+# 터치스크린 라우터 등록 (/touch, /touch/events)
+from api.touchscreen import router as touchscreen_router
+app.include_router(touchscreen_router)
+
 # 캡처 이미지 정적 서빙 — edge/captures 고정 (uvicorn 실행 위치와 무관). 라우터보다 뒤에 마운트.
 CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
 DEMO_SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/captures", StaticFiles(directory=str(CAPTURES_DIR)), name="captures")
 app.mount("/demo_samples", StaticFiles(directory=str(DEMO_SAMPLES_DIR)), name="demo_samples")
+
+# 터치스크린 정적 자원 (HTML/CSS/JS) — /touch/static/style.css 형태로 접근
+_STATIC_DIR = _EDGE_DIR / "static"
+_STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/touch/static", StaticFiles(directory=str(_STATIC_DIR)), name="touch-static")
 
 
 # ── 2-Stage 비전 검사 파이프라인 ──────────────────────────────────────────────

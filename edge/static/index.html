@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>PCB 검사 — 라즈베리파이 터치스크린</title>
+  <link rel="stylesheet" href="/touch/static/style.css" />
+</head>
+<body data-status="IDLE">
+
+  <!-- 화면 1: 라이브 카메라 -->
+  <section class="screen screen-live">
+    <img id="live-stream" src="/edge/camera/stream" alt="라이브 카메라" />
+    <div class="status-badge live">
+      <span class="dot"></span>LIVE
+    </div>
+  </section>
+
+  <!-- 화면 2: 검사 중 -->
+  <section class="screen screen-busy">
+    <div class="busy-content">
+      <div class="spinner"></div>
+      <h1 id="busy-message">검사 중...</h1>
+    </div>
+  </section>
+
+  <!-- 화면 3: 결과 -->
+  <section class="screen screen-result">
+    <div class="result-header" id="result-header">
+      <span id="result-icon">✓</span>
+      <span id="result-text">PASS</span>
+    </div>
+    <div class="result-canvas-wrap">
+      <canvas id="result-canvas"></canvas>
+    </div>
+    <div class="result-footer">
+      <span id="result-defects-count">결함 없음</span>
+    </div>
+  </section>
+
+  <script src="/touch/static/app.js"></script>
+</body>
+</html>
