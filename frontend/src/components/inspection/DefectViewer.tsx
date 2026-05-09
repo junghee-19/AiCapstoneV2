@@ -179,6 +179,13 @@ function DefectBox({
   const tw = Math.min(220, Math.max(88, cap.length * 7.2))
   const ty = sy > 22 ? sy - 21 : sy + 3
 
+  // 결함 중심 좌표 — 원본 픽셀 기준 float (소수점 1자리)
+  const cxOrig = x + w / 2
+  const cyOrig = y + h / 2
+  const coordCap = `(${cxOrig.toFixed(1)}, ${cyOrig.toFixed(1)}) px`
+  const coordW = Math.min(220, Math.max(96, coordCap.length * 6.6))
+  const cyText = sy + sh + 14
+
   return (
     <g>
       <rect x={sx} y={sy} width={sw} height={sh} rx={2} fill="none" stroke={color} strokeWidth={2} />
@@ -192,6 +199,28 @@ function DefectBox({
         fontFamily="ui-monospace, monospace"
       >
         {cap}
+      </text>
+      {/* 중심 좌표(원본 픽셀, 소수점) — 박스 아래쪽 중앙 */}
+      <rect
+        x={sx + sw / 2 - coordW / 2}
+        y={cyText - 11}
+        width={coordW}
+        height={15}
+        rx={3}
+        fill="rgba(15,23,42,0.9)"
+        stroke={color}
+        strokeWidth={1}
+      />
+      <text
+        x={sx + sw / 2}
+        y={cyText}
+        fill="#f0f9ff"
+        fontSize={10}
+        fontWeight={600}
+        textAnchor="middle"
+        fontFamily="ui-monospace, monospace"
+      >
+        {coordCap}
       </text>
     </g>
   )
