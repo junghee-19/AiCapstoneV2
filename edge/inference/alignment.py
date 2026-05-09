@@ -53,13 +53,13 @@ def compute_alignment(
     # confidence 내림차순 정렬 후 상위 2개 추출
     top2 = sorted(fiducials, key=lambda d: d.confidence, reverse=True)[:2]
 
-    # X 좌표 기준으로 마크1(왼쪽), 마크2(오른쪽) 구분
-    mark_a, mark_b = sorted(top2, key=lambda d: d.center_x)
+    # X 좌표(float) 기준으로 마크1(왼쪽), 마크2(오른쪽) 구분
+    mark_a, mark_b = sorted(top2, key=lambda d: d.center_x_f)
 
     # ── 오차 각도 계산 ────────────────────────────────────────────────────────
-    # 두 마크 중심점을 연결하는 벡터 (dx, dy)
-    dx = mark_b.center_x - mark_a.center_x
-    dy = mark_b.center_y - mark_a.center_y
+    # 두 마크 중심점을 연결하는 벡터 (dx, dy) — sub-pixel 보존
+    dx = mark_b.center_x_f - mark_a.center_x_f
+    dy = mark_b.center_y_f - mark_a.center_y_f
 
     # arctan2로 수평 기준 각도 계산 (라디안 → 도)
     # 이미지 좌표계는 Y축이 아래 방향이므로 -dy를 사용
@@ -67,9 +67,9 @@ def compute_alignment(
     angle_deg = abs(math.degrees(angle_rad))
 
     logger.info(
-        "[정렬] 마크1=(%d,%d), 마크2=(%d,%d), |기울기|=%.2f°, 보정가능한도=%.1f°",
-        mark_a.center_x, mark_a.center_y,
-        mark_b.center_x, mark_b.center_y,
+        "[정렬] 마크1=(%.2f,%.2f), 마크2=(%.2f,%.2f), |기울기|=%.3f°, 보정가능한도=%.1f°",
+        mark_a.center_x_f, mark_a.center_y_f,
+        mark_b.center_x_f, mark_b.center_y_f,
         angle_deg, max_deskew_deg,
     )
 
@@ -133,8 +133,8 @@ def deskew_image_by_fiducial_angle(
 
     mark_a = alignment.fiducial1
     mark_b = alignment.fiducial2
-    dx = mark_b.center_x - mark_a.center_x
-    dy = mark_b.center_y - mark_a.center_y
+    dx = mark_b.center_x_f - mark_a.center_x_f
+    dy = mark_b.center_y_f - mark_a.center_y_f
     angle_rad = math.atan2(-dy, dx)
     angle_deg = math.degrees(angle_rad)
 
@@ -203,8 +203,8 @@ def align_image_to_reference_by_fiducials(
     if alignment.fiducial1 is None or alignment.fiducial2 is None:
         raise ValueError("정합을 위해 fiducial1/2가 필요합니다.")
 
-    src1 = np.array([alignment.fiducial1.center_x, alignment.fiducial1.center_y], dtype=np.float64)
-    src2 = np.array([alignment.fiducial2.center_x, alignment.fiducial2.center_y], dtype=np.float64)
+    src1 = np.array([alignment.fiducial1.center_x_f, alignment.fiducial1.center_y_f], dtype=np.float64)
+    src2 = np.array([alignment.fiducial2.center_x_f, alignment.fiducial2.center_y_f], dtype=np.float64)
     dst1 = np.array([float(ref_f1[0]), float(ref_f1[1])], dtype=np.float64)
     dst2 = np.array([float(ref_f2[0]), float(ref_f2[1])], dtype=np.float64)
 

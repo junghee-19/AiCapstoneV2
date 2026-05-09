@@ -149,11 +149,11 @@ async def _wait_for_centered_stable_pcb_frame() -> tuple[np.ndarray, str, list, 
 
         if alignment.fiducial1 is not None and alignment.fiducial2 is not None:
             h, w = frame.shape[:2]
-            center_x = (alignment.fiducial1.center_x + alignment.fiducial2.center_x) / 2.0
-            center_y = (alignment.fiducial1.center_y + alignment.fiducial2.center_y) / 2.0
+            center_x = (alignment.fiducial1.center_x_f + alignment.fiducial2.center_x_f) / 2.0
+            center_y = (alignment.fiducial1.center_y_f + alignment.fiducial2.center_y_f) / 2.0
             span_px = math.hypot(
-                alignment.fiducial2.center_x - alignment.fiducial1.center_x,
-                alignment.fiducial2.center_y - alignment.fiducial1.center_y,
+                alignment.fiducial2.center_x_f - alignment.fiducial1.center_x_f,
+                alignment.fiducial2.center_y_f - alignment.fiducial1.center_y_f,
             )
             signature = (center_x, center_y, span_px, float(alignment.angle_error_deg))
             latest_valid = (frame, fiducials, fiducial_ms, alignment)
