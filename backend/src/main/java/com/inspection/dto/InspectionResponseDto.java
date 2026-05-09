@@ -103,10 +103,14 @@ public class InspectionResponseDto {
         return DefectDetailDto.builder()
                 .defectType(d.getDefectType())
                 .confidence(d.getConfidence())
-                .bboxX(d.getBboxX())
-                .bboxY(d.getBboxY())
-                .bboxWidth(d.getBboxWidth())
-                .bboxHeight(d.getBboxHeight())
+                .bboxX(toFloat(d.getBboxX()))
+                .bboxY(toFloat(d.getBboxY()))
+                .bboxWidth(toFloat(d.getBboxWidth()))
+                .bboxHeight(toFloat(d.getBboxHeight()))
                 .build();
+    }
+
+    private static Float toFloat(Integer value) {
+        return value == null ? null : value.floatValue();
     }
 }

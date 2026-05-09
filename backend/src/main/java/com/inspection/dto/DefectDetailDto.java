@@ -30,19 +30,19 @@ public class DefectDetailDto {
     @DecimalMin("0.0") @DecimalMax("1.0")
     private Float confidence;
 
-    /** 바운딩 박스 좌상단 X (픽셀) */
-    @NotNull @Min(0)
-    private Integer bboxX;
+    /** 바운딩 박스 좌상단 X (픽셀, 소수점) — 저장 시 Integer 반올림. */
+    @NotNull @DecimalMin("0.0")
+    private Float bboxX;
 
-    /** 바운딩 박스 좌상단 Y (픽셀) */
-    @NotNull @Min(0)
-    private Integer bboxY;
+    /** 바운딩 박스 좌상단 Y (픽셀, 소수점) */
+    @NotNull @DecimalMin("0.0")
+    private Float bboxY;
 
-    /** 바운딩 박스 너비 (픽셀) */
-    @NotNull @Min(1)
-    private Integer bboxWidth;
+    /** 바운딩 박스 너비 (픽셀, 소수점) */
+    @NotNull @DecimalMin("0.0")
+    private Float bboxWidth;
 
-    /** 바운딩 박스 높이 (픽셀) */
-    @NotNull @Min(1)
-    private Integer bboxHeight;
+    /** 바운딩 박스 높이 (픽셀, 소수점) */
+    @NotNull @DecimalMin("0.0")
+    private Float bboxHeight;
 }

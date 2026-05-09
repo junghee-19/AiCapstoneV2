@@ -54,12 +54,12 @@ def compute_alignment(
     top2 = sorted(fiducials, key=lambda d: d.confidence, reverse=True)[:2]
 
     # X 좌표(float) 기준으로 마크1(왼쪽), 마크2(오른쪽) 구분
-    mark_a, mark_b = sorted(top2, key=lambda d: d.center_x_f)
+    mark_a, mark_b = sorted(top2, key=lambda d: d.center_x)
 
     # ── 오차 각도 계산 ────────────────────────────────────────────────────────
     # 두 마크 중심점을 연결하는 벡터 (dx, dy) — sub-pixel 보존
-    dx = mark_b.center_x_f - mark_a.center_x_f
-    dy = mark_b.center_y_f - mark_a.center_y_f
+    dx = mark_b.center_x - mark_a.center_x
+    dy = mark_b.center_y - mark_a.center_y
 
     # arctan2로 수평 기준 각도 계산 (라디안 → 도)
     # 이미지 좌표계는 Y축이 아래 방향이므로 -dy를 사용
@@ -68,8 +68,8 @@ def compute_alignment(
 
     logger.info(
         "[정렬] 마크1=(%.2f,%.2f), 마크2=(%.2f,%.2f), |기울기|=%.3f°, 보정가능한도=%.1f°",
-        mark_a.center_x_f, mark_a.center_y_f,
-        mark_b.center_x_f, mark_b.center_y_f,
+        mark_a.center_x, mark_a.center_y,
+        mark_b.center_x, mark_b.center_y,
         angle_deg, max_deskew_deg,
     )
 
@@ -87,7 +87,7 @@ def compute_alignment(
 
 
 def _bbox_after_affine(bbox: BoundingBox, m23: np.ndarray) -> BoundingBox:
-    """axis-aligned bbox의 네 꼭짓점을 affine 변환한 뒤 축정렬 최소 사각형."""
+    """axis-aligned bbox의 네 꼭짓점을 affine 변환한 뒤 축정렬 최소 사각형 (float 보존)."""
     corners = np.array(
         [
             [bbox.x, bbox.y, 1.0],
@@ -102,18 +102,18 @@ def _bbox_after_affine(bbox: BoundingBox, m23: np.ndarray) -> BoundingBox:
     x_min, x_max = float(xs.min()), float(xs.max())
     y_min, y_max = float(ys.min()), float(ys.max())
     return BoundingBox(
-        x=max(0, int(x_min)),
-        y=max(0, int(y_min)),
-        width=max(1, int(round(x_max - x_min))),
-        height=max(1, int(round(y_max - y_min))),
+        x=max(0.0, x_min),
+        y=max(0.0, y_min),
+        width=max(1e-3, x_max - x_min),
+        height=max(1e-3, y_max - y_min),
     )
 
 
 def _clip_bbox_to_image(bbox: BoundingBox, w: int, h: int) -> BoundingBox:
-    x = max(0, min(bbox.x, w - 1))
-    y = max(0, min(bbox.y, h - 1))
-    bw = max(1, min(bbox.width, w - x))
-    bh = max(1, min(bbox.height, h - y))
+    x = max(0.0, min(bbox.x, float(w - 1)))
+    y = max(0.0, min(bbox.y, float(h - 1)))
+    bw = max(1e-3, min(bbox.width, float(w) - x))
+    bh = max(1e-3, min(bbox.height, float(h) - y))
     return BoundingBox(x=x, y=y, width=bw, height=bh)
 
 
@@ -133,8 +133,8 @@ def deskew_image_by_fiducial_angle(
 
     mark_a = alignment.fiducial1
     mark_b = alignment.fiducial2
-    dx = mark_b.center_x_f - mark_a.center_x_f
-    dy = mark_b.center_y_f - mark_a.center_y_f
+    dx = mark_b.center_x - mark_a.center_x
+    dy = mark_b.center_y - mark_a.center_y
     angle_rad = math.atan2(-dy, dx)
     angle_deg = math.degrees(angle_rad)
 
@@ -203,8 +203,8 @@ def align_image_to_reference_by_fiducials(
     if alignment.fiducial1 is None or alignment.fiducial2 is None:
         raise ValueError("정합을 위해 fiducial1/2가 필요합니다.")
 
-    src1 = np.array([alignment.fiducial1.center_x_f, alignment.fiducial1.center_y_f], dtype=np.float64)
-    src2 = np.array([alignment.fiducial2.center_x_f, alignment.fiducial2.center_y_f], dtype=np.float64)
+    src1 = np.array([alignment.fiducial1.center_x, alignment.fiducial1.center_y], dtype=np.float64)
+    src2 = np.array([alignment.fiducial2.center_x, alignment.fiducial2.center_y], dtype=np.float64)
     dst1 = np.array([float(ref_f1[0]), float(ref_f1[1])], dtype=np.float64)
     dst2 = np.array([float(ref_f2[0]), float(ref_f2[1])], dtype=np.float64)
 
@@ -279,18 +279,19 @@ def crop_inspection_roi_with_offset(
     b1 = alignment.fiducial1.bbox
     b2 = alignment.fiducial2.bbox
 
-    x_min = min(b1.x, b2.x)
-    y_min = min(b1.y, b2.y)
-    x_max = max(b1.x + b1.width, b2.x + b2.width)
-    y_max = max(b1.y + b1.height, b2.y + b2.height)
+    x_min_f = min(b1.x, b2.x)
+    y_min_f = min(b1.y, b2.y)
+    x_max_f = max(b1.x + b1.width, b2.x + b2.width)
+    y_max_f = max(b1.y + b1.height, b2.y + b2.height)
 
-    pad_x = int((x_max - x_min) * padding_ratio)
-    pad_y = int((y_max - y_min) * padding_ratio)
+    pad_x = (x_max_f - x_min_f) * padding_ratio
+    pad_y = (y_max_f - y_min_f) * padding_ratio
 
-    x_min = max(0, x_min - pad_x)
-    y_min = max(0, y_min - pad_y)
-    x_max = min(w, x_max + pad_x)
-    y_max = min(h, y_max + pad_y)
+    # numpy 슬라이싱은 정수만 허용 — 경계 좌표만 마지막에 int로 변환
+    x_min = max(0, int(x_min_f - pad_x))
+    y_min = max(0, int(y_min_f - pad_y))
+    x_max = min(w, int(round(x_max_f + pad_x)))
+    y_max = min(h, int(round(y_max_f + pad_y)))
 
     roi = image[y_min:y_max, x_min:x_max]
     logger.debug("[ROI] 크롭 영역: (%d,%d) ~ (%d,%d), 크기=%dx%d",

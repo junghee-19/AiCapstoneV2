@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 # device_id -> deque of inspection snapshots
-# 각 snapshot은 ((defect_type, center_x_f, center_y_f), ...) 튜플 리스트
+# 각 snapshot은 ((defect_type, center_x, center_y), ...) 튜플 리스트
 _history: dict[str, deque[list[tuple[str, float, float]]]] = {}
 _lock = threading.Lock()
 
@@ -47,7 +47,7 @@ def record_and_check(
 
     Args:
         device_id: 엣지 디바이스 ID
-        current_defects: 이번 검사에서 검출된 [(defect_type, center_x_f, center_y_f), ...]
+        current_defects: 이번 검사에서 검출된 [(defect_type, center_x, center_y), ...]
 
     Returns:
         (alarm, reason) — reason은 alarm=True일 때만 사람이 읽는 사유 문자열.

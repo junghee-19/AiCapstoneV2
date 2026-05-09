@@ -84,15 +84,15 @@ def _fiducial_confidences(alignment: AlignmentResult) -> tuple[Optional[float], 
     return f1, f2
 
 
-def _fiducial_centers_float(alignment: AlignmentResult) -> tuple[
+def _fiducial_centers(alignment: AlignmentResult) -> tuple[
     Optional[float], Optional[float], Optional[float], Optional[float]
 ]:
-    """소수점 정밀도 피듀셜 중심 좌표 (f1x_f, f1y_f, f2x_f, f2y_f)."""
-    f1x_f = round(alignment.fiducial1.center_x_f, 3) if alignment.fiducial1 else None
-    f1y_f = round(alignment.fiducial1.center_y_f, 3) if alignment.fiducial1 else None
-    f2x_f = round(alignment.fiducial2.center_x_f, 3) if alignment.fiducial2 else None
-    f2y_f = round(alignment.fiducial2.center_y_f, 3) if alignment.fiducial2 else None
-    return f1x_f, f1y_f, f2x_f, f2y_f
+    """피듀셜 중심 좌표 (소수점 보존)."""
+    f1x = round(alignment.fiducial1.center_x, 3) if alignment.fiducial1 else None
+    f1y = round(alignment.fiducial1.center_y, 3) if alignment.fiducial1 else None
+    f2x = round(alignment.fiducial2.center_x, 3) if alignment.fiducial2 else None
+    f2y = round(alignment.fiducial2.center_y, 3) if alignment.fiducial2 else None
+    return f1x, f1y, f2x, f2y
 
 
 def _save_frame(frame: np.ndarray, save_dir: Optional[Path] = None) -> str:
@@ -149,11 +149,11 @@ async def _wait_for_centered_stable_pcb_frame() -> tuple[np.ndarray, str, list, 
 
         if alignment.fiducial1 is not None and alignment.fiducial2 is not None:
             h, w = frame.shape[:2]
-            center_x = (alignment.fiducial1.center_x_f + alignment.fiducial2.center_x_f) / 2.0
-            center_y = (alignment.fiducial1.center_y_f + alignment.fiducial2.center_y_f) / 2.0
+            center_x = (alignment.fiducial1.center_x + alignment.fiducial2.center_x) / 2.0
+            center_y = (alignment.fiducial1.center_y + alignment.fiducial2.center_y) / 2.0
             span_px = math.hypot(
-                alignment.fiducial2.center_x_f - alignment.fiducial1.center_x_f,
-                alignment.fiducial2.center_y_f - alignment.fiducial1.center_y_f,
+                alignment.fiducial2.center_x - alignment.fiducial1.center_x,
+                alignment.fiducial2.center_y - alignment.fiducial1.center_y,
             )
             signature = (center_x, center_y, span_px, float(alignment.angle_error_deg))
             latest_valid = (frame, fiducials, fiducial_ms, alignment)
@@ -538,7 +538,6 @@ def _run_production_vision_pipeline(
                     packet = _build_packet(
                         result=InspectionResult.FAIL,
                         f1x=None, f1y=None, f2x=None, f2y=None,
-                        f1x_f=None, f1y_f=None, f2x_f=None, f2y_f=None,
                         f1_conf=None, f2_conf=None,
                         angle_error=0.0,
                         inference_ms=0,
@@ -546,10 +545,10 @@ def _run_production_vision_pipeline(
                             DefectPayload(
                                 defect_type="BOARD_TYPE_UNKNOWN",
                                 confidence=1.0,
-                                bbox_x=0,
-                                bbox_y=0,
-                                bbox_width=1,
-                                bbox_height=1,
+                                bbox_x=0.0,
+                                bbox_y=0.0,
+                                bbox_width=1.0,
+                                bbox_height=1.0,
                             )
                         ],
                         image_path=image_path,
@@ -579,12 +578,7 @@ def _run_production_vision_pipeline(
             measured_skew_deg,
         )
 
-        f1x = f1y = f2x = f2y = None
-        if alignment.fiducial1:
-            f1x, f1y = alignment.fiducial1.center_x, alignment.fiducial1.center_y
-        if alignment.fiducial2:
-            f2x, f2y = alignment.fiducial2.center_x, alignment.fiducial2.center_y
-        f1x_f, f1y_f, f2x_f, f2y_f = _fiducial_centers_float(alignment)
+        f1x, f1y, f2x, f2y = _fiducial_centers(alignment)
 
         if len(fiducials) < 2:
             logger.info("[파이프라인] PCB/피듀셜 미검출 → SKIPPED, Stage 2 건너뜀")
@@ -592,7 +586,6 @@ def _run_production_vision_pipeline(
             packet = _build_packet(
                 result=InspectionResult.SKIPPED,
                 f1x=f1x, f1y=f1y, f2x=f2x, f2y=f2y,
-                f1x_f=f1x_f, f1y_f=f1y_f, f2x_f=f2x_f, f2y_f=f2y_f,
                 f1_conf=f1c, f2_conf=f2c,
                 angle_error=measured_skew_deg,
                 inference_ms=fiducial_ms,
@@ -609,7 +602,6 @@ def _run_production_vision_pipeline(
             packet = _build_packet(
                 result=InspectionResult.FAIL,
                 f1x=f1x, f1y=f1y, f2x=f2x, f2y=f2y,
-                f1x_f=f1x_f, f1y_f=f1y_f, f2x_f=f2x_f, f2y_f=f2y_f,
                 f1_conf=f1c, f2_conf=f2c,
                 angle_error=measured_skew_deg,
                 inference_ms=fiducial_ms,
@@ -634,8 +626,6 @@ def _run_production_vision_pipeline(
         # 정합 전 피듀셜 중심을 보존한다.
         pre_align_f1x, pre_align_f1y = f1x, f1y
         pre_align_f2x, pre_align_f2y = f2x, f2y
-        pre_align_f1x_f, pre_align_f1y_f = f1x_f, f1y_f
-        pre_align_f2x_f, pre_align_f2y_f = f2x_f, f2y_f
 
         logger.info("[파이프라인] STEP 2-A′ — 좌표 정합 (translation/rotation/scale)")
         aligned_frame, alignment, _m = align_image_to_reference_by_fiducials(
@@ -653,16 +643,10 @@ def _run_production_vision_pipeline(
         logger.info("[파이프라인] 정합 후 이미지 저장: %s", aligned_path)
 
         if stage2_mode == "aligned":
-            if alignment.fiducial1:
-                f1x, f1y = alignment.fiducial1.center_x, alignment.fiducial1.center_y
-            if alignment.fiducial2:
-                f2x, f2y = alignment.fiducial2.center_x, alignment.fiducial2.center_y
-            f1x_f, f1y_f, f2x_f, f2y_f = _fiducial_centers_float(alignment)
+            f1x, f1y, f2x, f2y = _fiducial_centers(alignment)
         else:
             f1x, f1y = pre_align_f1x, pre_align_f1y
             f2x, f2y = pre_align_f2x, pre_align_f2y
-            f1x_f, f1y_f = pre_align_f1x_f, pre_align_f1y_f
-            f2x_f, f2y_f = pre_align_f2x_f, pre_align_f2y_f
 
         logger.info("[파이프라인] STEP 2-B — 결함 탐지 (입력=%s)", stage2_mode)
         stage2_source_image = raw_frame if stage2_mode == "raw" else frame
@@ -696,15 +680,11 @@ def _run_production_vision_pipeline(
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         defect_payloads: list[DefectPayload] = []
         for idx, d in enumerate(defect_items):
-            abs_x = d.bbox.x + roi_x
-            abs_y = d.bbox.y + roi_y
-            # float 정밀 좌표 (있으면) — roi 오프셋은 정수이므로 합산해도 소수점 보존
-            x_f = (d.bbox.x_f + float(roi_x)) if d.bbox.x_f is not None else None
-            y_f = (d.bbox.y_f + float(roi_y)) if d.bbox.y_f is not None else None
-            w_f = d.bbox.width_f
-            h_f = d.bbox.height_f
-            cx_f = (x_f + w_f / 2.0) if (x_f is not None and w_f is not None) else None
-            cy_f = (y_f + h_f / 2.0) if (y_f is not None and h_f is not None) else None
+            # roi 오프셋은 정수, bbox는 float — 합산해도 소수점 보존
+            abs_x = d.bbox.x + float(roi_x)
+            abs_y = d.bbox.y + float(roi_y)
+            cx = abs_x + d.bbox.width / 2.0
+            cy = abs_y + d.bbox.height / 2.0
 
             crop_path: Optional[str] = None
             if settings.DEFECT_CROP_SAVE_ENABLED:
@@ -720,16 +700,12 @@ def _run_production_vision_pipeline(
                 DefectPayload(
                     defect_type=d.defect_type,
                     confidence=d.confidence,
-                    bbox_x=abs_x,
-                    bbox_y=abs_y,
-                    bbox_width=d.bbox.width,
-                    bbox_height=d.bbox.height,
-                    bbox_x_f=round(x_f, 3) if x_f is not None else None,
-                    bbox_y_f=round(y_f, 3) if y_f is not None else None,
-                    bbox_width_f=round(w_f, 3) if w_f is not None else None,
-                    bbox_height_f=round(h_f, 3) if h_f is not None else None,
-                    center_x_f=round(cx_f, 3) if cx_f is not None else None,
-                    center_y_f=round(cy_f, 3) if cy_f is not None else None,
+                    bbox_x=round(abs_x, 3),
+                    bbox_y=round(abs_y, 3),
+                    bbox_width=round(d.bbox.width, 3),
+                    bbox_height=round(d.bbox.height, 3),
+                    center_x=round(cx, 3),
+                    center_y=round(cy, 3),
                     crop_path=crop_path,
                 )
             )
@@ -755,10 +731,10 @@ def _run_production_vision_pipeline(
                         DefectPayload(
                             defect_type=f"MISSING:{cls_name}:expected={expected},detected={detected},missing={missing}",
                             confidence=1.0,
-                            bbox_x=0,
-                            bbox_y=0,
-                            bbox_width=1,
-                            bbox_height=1,
+                            bbox_x=0.0,
+                            bbox_y=0.0,
+                            bbox_width=1.0,
+                            bbox_height=1.0,
                         )
                     )
                     logger.warning(
@@ -779,16 +755,15 @@ def _run_production_vision_pipeline(
         # 시계열 alarm 평가 — 동일 device의 직전 N회 결과 기반
         device_id_for_alarm = selected_board_type or settings.EDGE_DEVICE_ID
         alarm_input = [
-            (p.defect_type, float(p.center_x_f), float(p.center_y_f))
+            (p.defect_type, float(p.center_x), float(p.center_y))
             for p in defect_payloads
-            if p.center_x_f is not None and p.center_y_f is not None
+            if p.center_x is not None and p.center_y is not None
         ]
         alarm, alarm_reason = record_defect_alarm(device_id_for_alarm, alarm_input)
 
         packet = _build_packet(
             result=final_result,
             f1x=f1x, f1y=f1y, f2x=f2x, f2y=f2y,
-            f1x_f=f1x_f, f1y_f=f1y_f, f2x_f=f2x_f, f2y_f=f2y_f,
             f1_conf=f1c, f2_conf=f2c,
             angle_error=measured_skew_deg,
             inference_ms=fiducial_ms + defect_ms,
@@ -851,7 +826,10 @@ async def run_inspection_pipeline_from_source_file(
 
 def _build_packet(
     result: InspectionResult,
-    f1x, f1y, f2x, f2y,
+    f1x: Optional[float],
+    f1y: Optional[float],
+    f2x: Optional[float],
+    f2y: Optional[float],
     angle_error: float,
     inference_ms: int,
     defects: list[DefectPayload],
@@ -860,10 +838,6 @@ def _build_packet(
     f1_conf: Optional[float] = None,
     f2_conf: Optional[float] = None,
     device_id: Optional[str] = None,
-    f1x_f: Optional[float] = None,
-    f1y_f: Optional[float] = None,
-    f2x_f: Optional[float] = None,
-    f2y_f: Optional[float] = None,
 ) -> InspectionPacket:
     """InspectionPacket 조립 헬퍼."""
     total_ms = int((time.perf_counter() - pipeline_start) * 1000)
@@ -872,8 +846,6 @@ def _build_packet(
         result=result,
         fiducial1_x=f1x, fiducial1_y=f1y,
         fiducial2_x=f2x, fiducial2_y=f2y,
-        fiducial1_x_f=f1x_f, fiducial1_y_f=f1y_f,
-        fiducial2_x_f=f2x_f, fiducial2_y_f=f2y_f,
         fiducial1_confidence=f1_conf,
         fiducial2_confidence=f2_conf,
         angle_error_deg=angle_error,

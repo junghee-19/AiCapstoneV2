@@ -180,31 +180,23 @@ class YoloDetector:
                 if target_class and not _matches_target_class(class_name, target_class, num_cls):
                     continue
 
-                # YOLO xywh → 좌상단 기준 좌표로 변환
+                # YOLO xywh → 좌상단 기준 좌표로 변환 (소수점 보존, int 변환 없음)
                 # box.xywh: [center_x, center_y, width, height] (float)
                 xywh = box.xywh[0].tolist()
                 cx, cy, bw, bh = xywh
-                # float (소수점 보존) — 위치 정밀도용
-                x_f = max(0.0, cx - bw / 2.0)
-                y_f = max(0.0, cy - bh / 2.0)
-                bw_f = float(bw)
-                bh_f = float(bh)
-                # int — 하위 호환 유지
-                x = int(x_f)
-                y = int(y_f)
+                x = max(0.0, cx - bw / 2.0)
+                y = max(0.0, cy - bh / 2.0)
+                bw = max(1e-3, float(bw))
+                bh = max(1e-3, float(bh))
 
                 detection = DetectionItem(
                     defect_type=class_name,
                     confidence=round(conf, 4),
                     bbox=BoundingBox(
-                        x=max(0, x),
-                        y=max(0, y),
-                        width=max(1, int(bw)),
-                        height=max(1, int(bh)),
-                        x_f=round(x_f, 3),
-                        y_f=round(y_f, 3),
-                        width_f=round(bw_f, 3),
-                        height_f=round(bh_f, 3),
+                        x=round(x, 3),
+                        y=round(y, 3),
+                        width=round(bw, 3),
+                        height=round(bh, 3),
                     ),
                 )
                 detections.append(detection)

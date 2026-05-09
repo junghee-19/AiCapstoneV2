@@ -30,7 +30,11 @@
       "Bash(docker cp *)",
       "Bash(docker restart *)",
       "Bash(timeout 10 docker images aicapstone-edge:local *)",
-      "Bash(timeout 8 docker images aicapstone-edge:local --format \"{{.CreatedAt}}\")"
+      "Bash(timeout 8 docker images aicapstone-edge:local --format \"{{.CreatedAt}}\")",
+      "PowerShell(docker compose up *)",
+      "PowerShell(docker compose logs *)",
+      "PowerShell(Out-Null *)",
+      "PowerShell(Invoke-RestMethod -Uri http://localhost:8000/edge/inspect/dummy -Method POST -TimeoutSec 30 | ConvertTo-Json -Depth 8)"
     ]
   }
 }

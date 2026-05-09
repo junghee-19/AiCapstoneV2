@@ -177,20 +177,26 @@ def create_dummy_packet(
         num_defects = random.randint(1, 2)
         defect_types = ["TRACE_OPEN", "METAL_DAMAGE"]
         for i in range(num_defects):
+            bx = round(random.uniform(200.0, 800.0), 3)
+            by = round(random.uniform(100.0, 500.0), 3)
+            bw = round(random.uniform(30.0, 80.0), 3)
+            bh = round(random.uniform(20.0, 50.0), 3)
             defects.append(DefectPayload(
                 defect_type=random.choice(defect_types),
                 confidence=round(random.uniform(0.6, 0.95), 2),
-                bbox_x=random.randint(200, 800),
-                bbox_y=random.randint(100, 500),
-                bbox_width=random.randint(30, 80),
-                bbox_height=random.randint(20, 50),
+                bbox_x=bx,
+                bbox_y=by,
+                bbox_width=bw,
+                bbox_height=bh,
+                center_x=round(bx + bw / 2.0, 3),
+                center_y=round(by + bh / 2.0, 3),
             ))
 
     return InspectionPacket(
         device_id=device_id,
         result=result,
-        fiducial1_x=320, fiducial1_y=240,
-        fiducial2_x=960, fiducial2_y=242,
+        fiducial1_x=320.5, fiducial1_y=240.25,
+        fiducial2_x=960.75, fiducial2_y=242.125,
         fiducial1_confidence=round(random.uniform(0.82, 0.96), 3),
         fiducial2_confidence=round(random.uniform(0.82, 0.96), 3),
         angle_error_deg=round(random.uniform(0.1, 1.5), 2),

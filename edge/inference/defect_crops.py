@@ -29,10 +29,10 @@ def _safe_token(text: str) -> str:
 
 def save_defect_crop(
     source_image: np.ndarray,
-    bbox_x: int,
-    bbox_y: int,
-    bbox_w: int,
-    bbox_h: int,
+    bbox_x: float,
+    bbox_y: float,
+    bbox_w: float,
+    bbox_h: float,
     *,
     run_id: str,
     index: int,
