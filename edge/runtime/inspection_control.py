@@ -15,6 +15,7 @@ _auto_task: Optional[asyncio.Task[None]] = None
 _trigger_lock = asyncio.Lock()
 _idle_revert_task: Optional[asyncio.Task[None]] = None
 RESULT_DISPLAY_SECONDS: float = 6.0
+AUTO_INSPECTION_ENABLED: bool = False
 
 
 def _packet_to_touchscreen_payload(packet: InspectionPacket) -> dict[str, Any]:
@@ -74,6 +75,7 @@ async def _revert_to_idle_after(seconds: float) -> None:
 
 def auto_status() -> dict[str, Any]:
     return {
+        "enabled": AUTO_INSPECTION_ENABLED,
         "running": _auto_running,
         "interval_seconds": _auto_interval,
     }
@@ -128,6 +130,15 @@ async def trigger_inspection_once(stage2_source_mode: Optional[str] = None) -> I
 async def start_auto_inspection(interval: float = 5.0) -> dict[str, Any]:
     """Start the background auto-inspection loop if it is not already running."""
     global _auto_running, _auto_interval, _auto_task
+
+    if not AUTO_INSPECTION_ENABLED:
+        task = _auto_task
+        _auto_running = False
+        _auto_task = None
+        if task is not None and not task.done():
+            task.cancel()
+        logger.info("[검사제어] 자동 연속 검사는 임시 비활성화 상태입니다.")
+        return auto_status()
 
     if interval <= 0:
         raise ValueError("interval must be greater than 0")

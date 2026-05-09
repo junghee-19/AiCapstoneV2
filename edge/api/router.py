@@ -617,6 +617,8 @@ async def auto_inspect_start(
         status = await start_auto_inspection(interval)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    if not status.get("enabled", True):
+        return {"message": "자동 검사는 현재 임시 비활성화 상태입니다. 수동 검사만 사용할 수 있습니다."}
     if before["running"]:
         return {"message": f"자동 검사가 이미 실행 중입니다. (간격: {status['interval_seconds']}초)"}
     return {"message": f"✅ 자동 검사 시작 (간격: {interval}초) — /edge/inspect/auto/stop 으로 중지"}
