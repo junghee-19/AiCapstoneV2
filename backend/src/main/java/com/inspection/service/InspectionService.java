@@ -44,17 +44,6 @@ public class InspectionService {
     private final InspectionLogRepository inspectionLogRepository;
     private final DefectDetailRepository defectDetailRepository;
 
-    /** 엣지가 보낸 float 좌표를 DB 저장용 Integer로 반올림. null은 그대로 통과. */
-    private static Integer roundToInteger(Float value) {
-        return value == null ? null : Math.round(value);
-    }
-
-    /** width/height는 1 이상이어야 하므로 반올림 후 하한 1을 적용. */
-    private static Integer roundToIntegerAtLeastOne(Float value) {
-        if (value == null) return null;
-        return Math.max(1, Math.round(value));
-    }
-
     // ── 검사 결과 저장 ────────────────────────────────────────────────────────
 
     /**
@@ -74,15 +63,14 @@ public class InspectionService {
         log.info("[검사 수신] 디바이스: {}, 결과: {}, 시각: {}",
                 dto.getDeviceId(), dto.getResult(), dto.getInspectedAt());
 
-        // 1. 요청 DTO → InspectionLog 엔티티 구성
-        // 엣지가 보낸 float 좌표는 DB Integer 컬럼에 저장하기 위해 반올림한다.
+        // 1. 요청 DTO → InspectionLog 엔티티 구성 (float 좌표 그대로 저장)
         InspectionLog log = InspectionLog.builder()
                 .deviceId(dto.getDeviceId())
                 .result(InspectionResult.valueOf(dto.getResult()))
-                .fiducial1X(roundToInteger(dto.getFiducial1X()))
-                .fiducial1Y(roundToInteger(dto.getFiducial1Y()))
-                .fiducial2X(roundToInteger(dto.getFiducial2X()))
-                .fiducial2Y(roundToInteger(dto.getFiducial2Y()))
+                .fiducial1X(dto.getFiducial1X())
+                .fiducial1Y(dto.getFiducial1Y())
+                .fiducial2X(dto.getFiducial2X())
+                .fiducial2Y(dto.getFiducial2Y())
                 .fiducial1Confidence(dto.getFiducial1Confidence())
                 .fiducial2Confidence(dto.getFiducial2Confidence())
                 .angleErrorDeg(dto.getAngleErrorDeg())
@@ -99,10 +87,10 @@ public class InspectionService {
                         .inspectionLog(log)      // 외래키 설정
                         .defectType(defectDto.getDefectType())
                         .confidence(defectDto.getConfidence())
-                        .bboxX(roundToInteger(defectDto.getBboxX()))
-                        .bboxY(roundToInteger(defectDto.getBboxY()))
-                        .bboxWidth(roundToIntegerAtLeastOne(defectDto.getBboxWidth()))
-                        .bboxHeight(roundToIntegerAtLeastOne(defectDto.getBboxHeight()))
+                        .bboxX(defectDto.getBboxX())
+                        .bboxY(defectDto.getBboxY())
+                        .bboxWidth(defectDto.getBboxWidth())
+                        .bboxHeight(defectDto.getBboxHeight())
                         .build();
                 log.addDefect(defect);           // 부모 엔티티 리스트에 추가
             });

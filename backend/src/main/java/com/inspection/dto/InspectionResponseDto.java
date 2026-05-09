@@ -31,11 +31,11 @@ public class InspectionResponseDto {
     /** 최종 판정 결과 ("PASS" / "FAIL") */
     private String result;
 
-    // ── 피듀셜 마크 좌표 ─────────────────────────────────────────────────────
-    private Integer fiducial1X;
-    private Integer fiducial1Y;
-    private Integer fiducial2X;
-    private Integer fiducial2Y;
+    // ── 피듀셜 마크 좌표 (소수점 보존) ───────────────────────────────────────
+    private Float fiducial1X;
+    private Float fiducial1Y;
+    private Float fiducial2X;
+    private Float fiducial2Y;
 
     private Float fiducial1Confidence;
     private Float fiducial2Confidence;
@@ -103,14 +103,10 @@ public class InspectionResponseDto {
         return DefectDetailDto.builder()
                 .defectType(d.getDefectType())
                 .confidence(d.getConfidence())
-                .bboxX(toFloat(d.getBboxX()))
-                .bboxY(toFloat(d.getBboxY()))
-                .bboxWidth(toFloat(d.getBboxWidth()))
-                .bboxHeight(toFloat(d.getBboxHeight()))
+                .bboxX(d.getBboxX())
+                .bboxY(d.getBboxY())
+                .bboxWidth(d.getBboxWidth())
+                .bboxHeight(d.getBboxHeight())
                 .build();
-    }
-
-    private static Float toFloat(Integer value) {
-        return value == null ? null : value.floatValue();
     }
 }
