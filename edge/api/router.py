@@ -300,45 +300,20 @@ async def stream_camera() -> StreamingResponse:
         import main as main_mod
 
         cam = getattr(main_mod, "camera", None)
-        stage1 = (
-            getattr(main_mod, "fiducial_detector", None)
-            if settings.USE_SEPARATE_MODELS
-            else getattr(main_mod, "detector", None)
-        )
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"카메라 상태 확인 실패: {e}") from e
 
     if cam is None:
         raise HTTPException(status_code=503, detail="카메라가 초기화되지 않았습니다.")
-    if stage1 is None:
-        raise HTTPException(status_code=503, detail="YOLO 모델이 초기화되지 않았습니다.")
 
     async def frame_generator():
-        from inference.alignment import compute_alignment
-
-        last_fiducials: list[Any] = []
-        last_alignment = None
-        last_detection_at = 0.0
-        detection_interval_sec = 0.5
         frame_interval_sec = 0.07
 
         while True:
             try:
                 frame = cam.capture(flush=False)
 
-                now = time.perf_counter()
-                if now - last_detection_at >= detection_interval_sec:
-                    last_fiducials, _ = stage1.detect_fiducials(frame)
-                    last_alignment = compute_alignment(last_fiducials)
-                    last_detection_at = now
-
-                annotated = (
-                    _draw_detection_overlay(frame, last_fiducials, last_alignment)
-                    if last_alignment is not None
-                    else frame
-                )
-
-                ok, encoded = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                 if not ok:
                     await asyncio.sleep(0.1)
                     continue
