@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/touch", tags=["Touchscreen"])
 
-# edge/api/touchscreen.py → edge/static/
-_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+# edge/api/touchscreen.py → ../pi-touchscreen/  (정적 UI 는 별도 폴더로 분리)
+_STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "pi-touchscreen"
 
 
 @router.get("/", summary="터치스크린 메인 HTML")

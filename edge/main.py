@@ -391,10 +391,11 @@ DEMO_SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/captures", StaticFiles(directory=str(CAPTURES_DIR)), name="captures")
 app.mount("/demo_samples", StaticFiles(directory=str(DEMO_SAMPLES_DIR)), name="demo_samples")
 
-# 터치스크린 정적 자원 (HTML/CSS/JS) — /touch/static/style.css 형태로 접근
-_STATIC_DIR = _EDGE_DIR / "static"
-_STATIC_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/touch/static", StaticFiles(directory=str(_STATIC_DIR)), name="touch-static")
+# 터치스크린 정적 자원 (HTML/CSS/JS) — 프로젝트 루트의 pi-touchscreen/ 에서 서빙
+# edge 폴더와 분리해 별도 디렉토리로 둠 (UI 와 추론 로직의 책임 분리)
+_TOUCHSCREEN_DIR = _EDGE_DIR.parent / "pi-touchscreen"
+_TOUCHSCREEN_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/touch/static", StaticFiles(directory=str(_TOUCHSCREEN_DIR)), name="touch-static")
 
 
 # ── 2-Stage 비전 검사 파이프라인 ──────────────────────────────────────────────
