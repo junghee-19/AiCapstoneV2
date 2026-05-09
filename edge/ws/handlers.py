@@ -17,6 +17,16 @@ from ws.protocol import make_event, packet_summary
 logger = logging.getLogger(__name__)
 
 
+def _normalize_stage2_mode(payload: dict[str, Any]) -> str:
+    stage2_source = payload.get("stage2Source", payload.get("stage2_source"))
+    mode = (stage2_source or settings.STAGE2_SOURCE_MODE).strip().lower()
+    if mode == "deskew":
+        mode = "aligned"
+    if mode not in {"raw", "aligned"}:
+        raise ValueError("stage2Source must be 'raw' or 'aligned'")
+    return mode
+
+
 async def handle_server_message(message: dict[str, Any]) -> dict[str, Any]:
     command = str(message.get("type") or message.get("command") or "").strip()
     request_id = message.get("requestId") or message.get("request_id")
@@ -24,7 +34,7 @@ async def handle_server_message(message: dict[str, Any]) -> dict[str, Any]:
 
     try:
         if command in {"inspect.trigger", "inspect/trigger", "/inspect/trigger"}:
-            packet = await trigger_inspection_once(payload.get("stage2Source"))
+            packet = await trigger_inspection_once(_normalize_stage2_mode(payload))
             return make_event(
                 "inspect.trigger.result",
                 request_id=request_id,

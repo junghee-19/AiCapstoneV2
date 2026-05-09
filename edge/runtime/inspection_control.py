@@ -86,13 +86,30 @@ async def trigger_inspection_once(stage2_source_mode: Optional[str] = None) -> I
         logger.info("[검사제어] 수동 검사 실행")
         await state.set_busy()
         try:
-            from main import run_inspection_pipeline
+            import main as main_mod
         except ImportError as e:
             await state.set_idle()
             raise RuntimeError("검사 파이프라인을 로드할 수 없습니다.") from e
 
+        if getattr(main_mod, "camera", None) is None:
+            await state.set_idle()
+            raise RuntimeError(
+                "카메라가 초기화되지 않아 실제 검사를 실행할 수 없습니다. "
+                "개발 환경에서는 /edge/inspect/dummy 또는 저장 이미지 검사를 사용하고, "
+                "운영 환경에서는 컨테이너에 카메라 장치가 연결되어 있는지 확인하세요."
+            )
+
+        stage1_detector = (
+            getattr(main_mod, "fiducial_detector", None)
+            if getattr(main_mod.settings, "USE_SEPARATE_MODELS", False)
+            else getattr(main_mod, "detector", None)
+        )
+        if stage1_detector is None:
+            await state.set_idle()
+            raise RuntimeError("Stage 1 YOLO 탐지기가 로드되지 않아 검사를 실행할 수 없습니다.")
+
         try:
-            packet = await run_inspection_pipeline(
+            packet = await main_mod.run_inspection_pipeline(
                 stage2_source_mode=stage2_source_mode,
                 force_camera=True,
             )
