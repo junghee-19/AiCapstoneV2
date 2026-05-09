@@ -89,15 +89,15 @@ function formatDateTime(iso: string): { date: string; time: string } {
   }
 }
 
-/** 피듀셜 중심 좌표 (보정 후 기준, 픽셀) — 테이블용 짧은 문자열 */
+/** 피듀셜 중심 좌표 (보정 후 기준, 픽셀, 소수점 1자리) — 테이블용 짧은 문자열 */
 function formatFiducialCells(log: InspectionLog): string {
   const p1 =
     log.fiducial1X != null && log.fiducial1Y != null
-      ? `F1 (${log.fiducial1X}, ${log.fiducial1Y})`
+      ? `F1 (${log.fiducial1X.toFixed(1)}, ${log.fiducial1Y.toFixed(1)})`
       : null
   const p2 =
     log.fiducial2X != null && log.fiducial2Y != null
-      ? `F2 (${log.fiducial2X}, ${log.fiducial2Y})`
+      ? `F2 (${log.fiducial2X.toFixed(1)}, ${log.fiducial2Y.toFixed(1)})`
       : null
   if (p1 && p2) return `${p1} · ${p2}`
   if (p1) return p1

@@ -36,7 +36,8 @@
       "PowerShell(Out-Null *)",
       "PowerShell(Invoke-RestMethod -Uri http://localhost:8000/edge/inspect/dummy -Method POST -TimeoutSec 30 | ConvertTo-Json -Depth 8)",
       "PowerShell(docker exec *)",
-      "PowerShell($resp = Invoke-RestMethod -Uri http://localhost:8000/edge/inspect/demo/fail -Method POST -TimeoutSec 30; $resp.server_response | ConvertTo-Json -Depth 8)"
+      "PowerShell($resp = Invoke-RestMethod -Uri http://localhost:8000/edge/inspect/demo/fail -Method POST -TimeoutSec 30; $resp.server_response | ConvertTo-Json -Depth 8)",
+      "PowerShell(docker compose ps *)"
     ]
   }
 }
