@@ -11,7 +11,26 @@
       "Bash(python *)",
       "Bash(docker buildx *)",
       "Bash(docker system *)",
-      "Bash(docker version *)"
+      "Bash(docker version *)",
+      "Bash(git *)",
+      "Bash(docker compose *)",
+      "PowerShell(Join-Path *)",
+      "Bash(docker exec aicapstone-frontend *)",
+      "Bash(docker run *)",
+      "Bash(docker exec *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(curl.exe -s -4 \"http://localhost:8080/api/inspections/recent?limit=2\")",
+      "Bash(timeout 10 docker ps *)",
+      "Bash(timeout 15 docker images aicapstone-edge:local --format \"{{.ID}} {{.CreatedAt}} {{.Size}}\")",
+      "Bash(timeout 8 docker images aicapstone-edge:local --format \"{{.ID}} {{.CreatedAt}}\")",
+      "Bash(timeout 8 docker ps --format \"{{.Names}}\")",
+      "PowerShell(Get-Process *)",
+      "Bash(timeout 15 docker ps --format \"{{.Names}}: {{.Status}}\")",
+      "Bash(timeout 15 docker images aicapstone-edge:local --format \"{{.CreatedAt}}\")",
+      "Bash(docker cp *)",
+      "Bash(docker restart *)",
+      "Bash(timeout 10 docker images aicapstone-edge:local *)",
+      "Bash(timeout 8 docker images aicapstone-edge:local --format \"{{.CreatedAt}}\")"
     ]
   }
 }
