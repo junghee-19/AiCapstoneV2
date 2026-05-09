@@ -112,16 +112,3 @@ export const triggerEdgeInspection = async (deviceId: string): Promise<EdgeComma
   return data
 }
 
-/**
- * 이미지 업로드 → Spring 백엔드 /api/inspections (multipart)
- * 백엔드가 inference-service로 forward → DB 저장 후 응답.
- */
-export const inspectImage = async (file: File): Promise<InspectionLog> => {
-  const formData = new FormData()
-  formData.append('image', file)
-
-  const { data } = await apiClient.post<InspectionLog>('/inspections', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return data
-}

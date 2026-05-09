@@ -23,9 +23,9 @@ import InspectionTable from '@/components/inspection/InspectionTable'
 import {
   deleteAllInspections,
   fetchEdgeDevices,
-  inspectImage,
   triggerEdgeInspection,
 } from '@/api/inspectionApi'
+import { triggerInspectionFromUpload } from '@/api/edgeApi'
 import { useRecentInspections } from '@/hooks/useInspectionData'
 
 export default function DashboardPage() {
@@ -58,11 +58,11 @@ export default function DashboardPage() {
     queryClient.invalidateQueries({ queryKey: ['inspections'] })
   }
 
-  // 업로드 검사 — 파일 업로드 → Spring → inference-service → DB 저장
+  // 업로드 검사 — edge로 직접 multipart 전송 → 백그라운드 추론 → 결과는 edge가 backend로 POST
   const uploadInspectMutation = useMutation({
-    mutationFn: inspectImage,
+    mutationFn: triggerInspectionFromUpload,
     onSuccess: (data) => {
-      setActionMsg({ type: 'ok', text: `검사 완료 — 결과: ${data.result}` })
+      setActionMsg({ type: 'ok', text: data.message || '업로드 검사를 시작했습니다.' })
       setUploadFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
       invalidateInspections()
@@ -216,7 +216,7 @@ export default function DashboardPage() {
               </button>
             </div>
             <p className="text-[11px] text-gray-600 leading-snug">
-              업로드 이미지는 백엔드를 거쳐 inference-service에서 검사됩니다.
+              업로드 이미지는 edge에서 추론 후 결과가 백엔드 DB에 적재됩니다.
             </p>
           </div>
         </div>
