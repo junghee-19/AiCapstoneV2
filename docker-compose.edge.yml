@@ -1,0 +1,19 @@
+services:
+  edge:
+    build:
+      context: ./edge
+    container_name: inspection-edge
+    env_file:
+      - path: ./edge/.env
+        required: false
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "${EDGE_API_PORT:-8000}:8000"
+    devices:
+      - "${CAMERA_DEVICE:-/dev/video0}:${CAMERA_DEVICE:-/dev/video0}"
+    volumes:
+      - ./edge/weights:/app/weights
+      - ./edge/captures:/app/captures
+      - ./edge/demo_samples:/app/demo_samples
+    restart: unless-stopped
