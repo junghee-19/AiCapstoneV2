@@ -1,7 +1,8 @@
 services:
   edge:
     build:
-      context: ./edge
+      context: .
+      dockerfile: edge/Dockerfile
     container_name: inspection-edge
     env_file:
       - path: ./edge/.env
