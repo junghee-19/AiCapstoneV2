@@ -242,4 +242,21 @@
   if (liveStream && !liveStream.src) {
     liveStream.src = '/edge/camera/stream'
   }
+
+  // ── RESULT 화면 탭 시 LIVE 로 복귀 ─────────────────────────────────────
+  const resultScreen = document.querySelector('.screen-result')
+  if (resultScreen) {
+    const dismiss = () => {
+      // RESULT 상태일 때만 작동 (IDLE/BUSY 에서는 무시)
+      if (body.dataset.status !== 'RESULT') return
+      fetch('/touch/dismiss', { method: 'POST' }).catch((err) => {
+        console.warn('[touch] dismiss 요청 실패:', err)
+      })
+    }
+    resultScreen.addEventListener('click', dismiss)
+    resultScreen.addEventListener('touchend', (e) => {
+      e.preventDefault()
+      dismiss()
+    }, { passive: false })
+  }
 })()

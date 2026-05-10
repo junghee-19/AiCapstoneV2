@@ -36,6 +36,13 @@ async def serve_index() -> FileResponse:
     return FileResponse(str(_STATIC_DIR / "index.html"), media_type="text/html")
 
 
+@router.post("/dismiss", summary="결과 화면 닫고 라이브 화면으로 복귀")
+async def dismiss_result() -> dict:
+    """터치스크린에서 RESULT 화면을 탭하면 호출 — IDLE 로 전환해 라이브 카메라 표시."""
+    await get_touchscreen_state().set_idle()
+    return {"ok": True, "status": "IDLE"}
+
+
 @router.get("/events", summary="터치스크린 상태 SSE")
 async def sse_events() -> StreamingResponse:
     """
