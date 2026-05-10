@@ -574,6 +574,15 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                     const cx = d.bboxX + Math.round(d.bboxWidth / 2)
                     const cy = d.bboxY + Math.round(d.bboxHeight / 2)
                     const color = DEFECT_COLOR[d.defectType] ?? '#f87171'
+                    // fiducial 좌표 있으면 부품 중심 → 마크까지 거리 계산
+                    const distF1 =
+                      log?.fiducial1X != null && log?.fiducial1Y != null
+                        ? Math.hypot(cx - log.fiducial1X, cy - log.fiducial1Y)
+                        : null
+                    const distF2 =
+                      log?.fiducial2X != null && log?.fiducial2Y != null
+                        ? Math.hypot(cx - log.fiducial2X, cy - log.fiducial2Y)
+                        : null
                     return (
                       <div
                         key={`${d.defectType}-${d.bboxX}-${d.bboxY}-${i}`}
@@ -591,6 +600,13 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                           <div>좌상단: ({d.bboxX}, {d.bboxY})</div>
                           <div>크기: {d.bboxWidth}×{d.bboxHeight}px</div>
                           <div className="text-sky-300">중심: ({cx}, {cy})</div>
+                          {(distF1 != null || distF2 != null) && (
+                            <div className="text-cyan-300 mt-1">
+                              {distF1 != null && <span>F1까지: {distF1.toFixed(1)}px</span>}
+                              {distF1 != null && distF2 != null && <span className="mx-1.5 text-gray-600">|</span>}
+                              {distF2 != null && <span>F2까지: {distF2.toFixed(1)}px</span>}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
