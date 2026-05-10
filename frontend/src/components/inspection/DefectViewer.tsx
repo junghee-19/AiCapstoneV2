@@ -144,7 +144,7 @@ function FiducialMarker({
         textAnchor="middle"
         fontFamily="ui-monospace, monospace"
       >
-        {`(${Math.round(x)}, ${Math.round(y)}) px`}
+        {`(${x.toFixed(1)}, ${y.toFixed(1)}) px`}
       </text>
     </g>
   )
@@ -179,6 +179,13 @@ function DefectBox({
   const tw = Math.min(220, Math.max(88, cap.length * 7.2))
   const ty = sy > 22 ? sy - 21 : sy + 3
 
+  // 결함 중심 좌표 — 원본 픽셀 기준 float (소수점 1자리)
+  const cxOrig = x + w / 2
+  const cyOrig = y + h / 2
+  const coordCap = `(${cxOrig.toFixed(1)}, ${cyOrig.toFixed(1)}) px`
+  const coordW = Math.min(220, Math.max(96, coordCap.length * 6.6))
+  const cyText = sy + sh + 14
+
   return (
     <g>
       <rect x={sx} y={sy} width={sw} height={sh} rx={2} fill="none" stroke={color} strokeWidth={2} />
@@ -192,6 +199,28 @@ function DefectBox({
         fontFamily="ui-monospace, monospace"
       >
         {cap}
+      </text>
+      {/* 중심 좌표(원본 픽셀, 소수점) — 박스 아래쪽 중앙 */}
+      <rect
+        x={sx + sw / 2 - coordW / 2}
+        y={cyText - 11}
+        width={coordW}
+        height={15}
+        rx={3}
+        fill="rgba(15,23,42,0.9)"
+        stroke={color}
+        strokeWidth={1}
+      />
+      <text
+        x={sx + sw / 2}
+        y={cyText}
+        fill="#f0f9ff"
+        fontSize={10}
+        fontWeight={600}
+        textAnchor="middle"
+        fontFamily="ui-monospace, monospace"
+      >
+        {coordCap}
       </text>
     </g>
   )
@@ -553,13 +582,13 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
               {log.fiducial1X != null && log.fiducial1Y != null && (
                 <MetaCoordRow
                   label="F1 중심 (px)"
-                  value={`(${log.fiducial1X}, ${log.fiducial1Y})`}
+                  value={`(${log.fiducial1X.toFixed(1)}, ${log.fiducial1Y.toFixed(1)})`}
                 />
               )}
               {log.fiducial2X != null && log.fiducial2Y != null && (
                 <MetaCoordRow
                   label="F2 중심 (px)"
-                  value={`(${log.fiducial2X}, ${log.fiducial2Y})`}
+                  value={`(${log.fiducial2X.toFixed(1)}, ${log.fiducial2Y.toFixed(1)})`}
                 />
               )}
               {f12DistancePx != null && (
@@ -590,8 +619,8 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                 </h4>
                 <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
                   {overlayDefects.map((d, i) => {
-                    const cx = d.bboxX + Math.round(d.bboxWidth / 2)
-                    const cy = d.bboxY + Math.round(d.bboxHeight / 2)
+                    const cx = d.bboxX + d.bboxWidth / 2
+                    const cy = d.bboxY + d.bboxHeight / 2
                     const color = DEFECT_COLOR[d.defectType] ?? '#f87171'
                     return (
                       <div
@@ -607,9 +636,9 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                           </span>
                         </div>
                         <div className="text-[11px] font-mono text-gray-300 leading-relaxed">
-                          <div>좌상단: ({d.bboxX}, {d.bboxY})</div>
-                          <div>크기: {d.bboxWidth}×{d.bboxHeight}px</div>
-                          <div className="text-sky-300">중심: ({cx}, {cy})</div>
+                          <div>좌상단: ({d.bboxX.toFixed(1)}, {d.bboxY.toFixed(1)})</div>
+                          <div>크기: {d.bboxWidth.toFixed(1)}×{d.bboxHeight.toFixed(1)}px</div>
+                          <div className="text-sky-300">중심: ({cx.toFixed(1)}, {cy.toFixed(1)})</div>
                         </div>
                       </div>
                     )

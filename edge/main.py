@@ -53,6 +53,7 @@ from inference.alignment import (
     compute_alignment,
     crop_inspection_roi_with_offset,
 )
+from inference.defect_crops import save_defect_crop
 from inference.yolo_detector import YoloDetector
 from models.schemas import (
     AlignmentResult,
@@ -60,6 +61,7 @@ from models.schemas import (
     InspectionPacket,
     InspectionResult,
 )
+from runtime.defect_alarm import record_and_check as record_defect_alarm
 from runtime.inspection_control import stop_auto_inspection
 from ws.client import run_edge_ws_client
 
@@ -80,6 +82,17 @@ def _fiducial_confidences(alignment: AlignmentResult) -> tuple[Optional[float], 
     f1 = float(alignment.fiducial1.confidence) if alignment.fiducial1 else None
     f2 = float(alignment.fiducial2.confidence) if alignment.fiducial2 else None
     return f1, f2
+
+
+def _fiducial_centers(alignment: AlignmentResult) -> tuple[
+    Optional[float], Optional[float], Optional[float], Optional[float]
+]:
+    """피듀셜 중심 좌표 (소수점 보존)."""
+    f1x = round(alignment.fiducial1.center_x, 3) if alignment.fiducial1 else None
+    f1y = round(alignment.fiducial1.center_y, 3) if alignment.fiducial1 else None
+    f2x = round(alignment.fiducial2.center_x, 3) if alignment.fiducial2 else None
+    f2y = round(alignment.fiducial2.center_y, 3) if alignment.fiducial2 else None
+    return f1x, f1y, f2x, f2y
 
 
 def _save_frame(frame: np.ndarray, save_dir: Optional[Path] = None) -> str:
@@ -209,6 +222,7 @@ async def _wait_for_centered_stable_pcb_frame() -> tuple[np.ndarray, str, list, 
 camera:           Optional[CameraCapture] = None
 detector:         Optional[YoloDetector]  = None  # 단일 모델 모드
 sender:           Optional[ServerSender]   = None
+gpio:             Any = None
 board_id_detector: Optional[YoloDetector] = None
 board_profiles: dict[str, dict[str, Any]] = {}
 board_detector_cache: dict[str, YoloDetector] = {}
@@ -389,12 +403,17 @@ app.mount("/demo_samples", StaticFiles(directory=str(DEMO_SAMPLES_DIR)), name="d
 
 # ── 2-Stage 비전 검사 파이프라인 ──────────────────────────────────────────────
 
-async def run_inspection_pipeline(stage2_source_mode: Optional[str] = None) -> Optional[InspectionPacket]:
+async def run_inspection_pipeline(
+    stage2_source_mode: Optional[str] = None,
+    *,
+    force_camera: bool = False,
+) -> Optional[InspectionPacket]:
     """
     PCB 검사 전체 파이프라인을 실행한다.
 
     개발(ENVIRONMENT=development) 환경:
         카메라/YOLO 없이 더미 데이터로 파이프라인 흐름을 테스트한다.
+        단, force_camera=True인 수동 트리거는 실제 카메라 캡처를 수행한다.
 
     운영(ENVIRONMENT=production) 환경:
         실제 카메라 캡처 → YOLO 추론 → GPIO 알람 → 서버 전송을 수행한다.
@@ -406,7 +425,22 @@ async def run_inspection_pipeline(stage2_source_mode: Optional[str] = None) -> O
     pipeline_start = time.perf_counter()
 
     # ── 개발 환경: 더미 모드 ─────────────────────────────────────────────────
-    if settings.ENVIRONMENT == "development" or camera is None:
+    if camera is None:
+        if force_camera:
+            logger.error("[파이프라인] 실제 카메라 검사 요청이지만 카메라가 초기화되지 않았습니다.")
+            return None
+        logger.info("[파이프라인] 카메라 없음 — 더미 모드 실행")
+        packet = create_dummy_packet()
+
+        # 서버 전송
+        if sender:
+            sender.send(packet)
+
+        total_ms = int((time.perf_counter() - pipeline_start) * 1000)
+        logger.info("[파이프라인] 더미 완료: %s (%dms)", packet.result.value, total_ms)
+        return packet
+
+    if settings.ENVIRONMENT == "development" and not force_camera:
         logger.info("[파이프라인] 더미 모드 실행")
         packet = create_dummy_packet()
 
@@ -427,12 +461,13 @@ async def run_inspection_pipeline(stage2_source_mode: Optional[str] = None) -> O
 
         frame, image_path, fiducials, fiducial_ms, alignment = await _wait_for_centered_stable_pcb_frame()
 
-        debug_imshow = settings.ENVIRONMENT == "development"
+        debug_imshow = settings.ENVIRONMENT == "development" and not force_camera
         mode = (stage2_source_mode or settings.STAGE2_SOURCE_MODE).strip().lower()
         return _run_production_vision_pipeline(
             frame,
             image_path,
             pipeline_start,
+            stage2_source_mode=mode,
             debug_imshow=debug_imshow,
             fiducials_precomputed=fiducials,
             fiducial_ms_precomputed=fiducial_ms,
@@ -510,10 +545,10 @@ def _run_production_vision_pipeline(
                             DefectPayload(
                                 defect_type="BOARD_TYPE_UNKNOWN",
                                 confidence=1.0,
-                                bbox_x=0,
-                                bbox_y=0,
-                                bbox_width=1,
-                                bbox_height=1,
+                                bbox_x=0.0,
+                                bbox_y=0.0,
+                                bbox_width=1.0,
+                                bbox_height=1.0,
                             )
                         ],
                         image_path=image_path,
@@ -543,11 +578,7 @@ def _run_production_vision_pipeline(
             measured_skew_deg,
         )
 
-        f1x = f1y = f2x = f2y = None
-        if alignment.fiducial1:
-            f1x, f1y = alignment.fiducial1.center_x, alignment.fiducial1.center_y
-        if alignment.fiducial2:
-            f2x, f2y = alignment.fiducial2.center_x, alignment.fiducial2.center_y
+        f1x, f1y, f2x, f2y = _fiducial_centers(alignment)
 
         if len(fiducials) < 2:
             logger.info("[파이프라인] PCB/피듀셜 미검출 → SKIPPED, Stage 2 건너뜀")
@@ -612,10 +643,7 @@ def _run_production_vision_pipeline(
         logger.info("[파이프라인] 정합 후 이미지 저장: %s", aligned_path)
 
         if stage2_mode == "aligned":
-            if alignment.fiducial1:
-                f1x, f1y = alignment.fiducial1.center_x, alignment.fiducial1.center_y
-            if alignment.fiducial2:
-                f2x, f2y = alignment.fiducial2.center_x, alignment.fiducial2.center_y
+            f1x, f1y, f2x, f2y = _fiducial_centers(alignment)
         else:
             f1x, f1y = pre_align_f1x, pre_align_f1y
             f2x, f2y = pre_align_f2x, pre_align_f2y
@@ -649,17 +677,38 @@ def _run_production_vision_pipeline(
             # 부품/영역 다클래스 표시용: 박스는 전부 전송, 판정은 정렬만 만족하면 PASS
             final_result = InspectionResult.PASS
 
-        defect_payloads = [
-            DefectPayload(
-                defect_type=d.defect_type,
-                confidence=d.confidence,
-                bbox_x=d.bbox.x + roi_x,
-                bbox_y=d.bbox.y + roi_y,
-                bbox_width=d.bbox.width,
-                bbox_height=d.bbox.height,
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        defect_payloads: list[DefectPayload] = []
+        for idx, d in enumerate(defect_items):
+            # roi 오프셋은 정수, bbox는 float — 합산해도 소수점 보존
+            abs_x = d.bbox.x + float(roi_x)
+            abs_y = d.bbox.y + float(roi_y)
+            cx = abs_x + d.bbox.width / 2.0
+            cy = abs_y + d.bbox.height / 2.0
+
+            crop_path: Optional[str] = None
+            if settings.DEFECT_CROP_SAVE_ENABLED:
+                crop_path = save_defect_crop(
+                    stage2_source_image,
+                    abs_x, abs_y, d.bbox.width, d.bbox.height,
+                    run_id=run_id,
+                    index=idx,
+                    defect_type=d.defect_type,
+                )
+
+            defect_payloads.append(
+                DefectPayload(
+                    defect_type=d.defect_type,
+                    confidence=d.confidence,
+                    bbox_x=round(abs_x, 3),
+                    bbox_y=round(abs_y, 3),
+                    bbox_width=round(d.bbox.width, 3),
+                    bbox_height=round(d.bbox.height, 3),
+                    center_x=round(cx, 3),
+                    center_y=round(cy, 3),
+                    crop_path=crop_path,
+                )
             )
-            for d in defect_items
-        ]
 
         # expected_counts 기반 누락 판정:
         # - 보드 프로파일에 선언된 필수 클래스 기대 개수보다 실제 검출 개수가 적으면 FAIL 처리
@@ -682,10 +731,10 @@ def _run_production_vision_pipeline(
                         DefectPayload(
                             defect_type=f"MISSING:{cls_name}:expected={expected},detected={detected},missing={missing}",
                             confidence=1.0,
-                            bbox_x=0,
-                            bbox_y=0,
-                            bbox_width=1,
-                            bbox_height=1,
+                            bbox_x=0.0,
+                            bbox_y=0.0,
+                            bbox_width=1.0,
+                            bbox_height=1.0,
                         )
                     )
                     logger.warning(
@@ -702,6 +751,16 @@ def _run_production_vision_pipeline(
         if missing_payloads:
             final_result = InspectionResult.FAIL
         all_defects = defect_payloads + missing_payloads
+
+        # 시계열 alarm 평가 — 동일 device의 직전 N회 결과 기반
+        device_id_for_alarm = selected_board_type or settings.EDGE_DEVICE_ID
+        alarm_input = [
+            (p.defect_type, float(p.center_x), float(p.center_y))
+            for p in defect_payloads
+            if p.center_x is not None and p.center_y is not None
+        ]
+        alarm, alarm_reason = record_defect_alarm(device_id_for_alarm, alarm_input)
+
         packet = _build_packet(
             result=final_result,
             f1x=f1x, f1y=f1y, f2x=f2x, f2y=f2y,
@@ -713,6 +772,8 @@ def _run_production_vision_pipeline(
             pipeline_start=pipeline_start,
             device_id=selected_board_type,
         )
+        packet.alarm = alarm
+        packet.alarm_reason = alarm_reason
 
         if selected_board_type:
             logger.info("[멀티보드] 선택된 보드 타입: %s", selected_board_type)
@@ -765,7 +826,10 @@ async def run_inspection_pipeline_from_source_file(
 
 def _build_packet(
     result: InspectionResult,
-    f1x, f1y, f2x, f2y,
+    f1x: Optional[float],
+    f1y: Optional[float],
+    f2x: Optional[float],
+    f2y: Optional[float],
     angle_error: float,
     inference_ms: int,
     defects: list[DefectPayload],

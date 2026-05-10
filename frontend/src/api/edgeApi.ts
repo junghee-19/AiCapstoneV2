@@ -58,8 +58,7 @@ export async function triggerInspectionFromFile(path: string): Promise<{ message
 
 /** 브라우저 파일 업로드로 검사 1회 (백그라운드). 결과는 Spring DB에 적재 */
 export async function triggerInspectionFromUpload(
-  file: File,
-  stage2Source: Stage2SourceMode
+  file: File
 ): Promise<{ message: string }> {
   const formData = new FormData()
   formData.append('image', file)

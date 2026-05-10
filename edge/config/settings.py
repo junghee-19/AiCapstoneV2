@@ -130,6 +130,18 @@ class Settings(BaseSettings):
     # "development": 개발 PC에서 더미 데이터로 동작
     ENVIRONMENT: str = Field(default="development")
 
+    # ── per-defect 크롭 보존 ─────────────────────────────────────────────────
+    # 검사 시 결함 박스를 captures/defects/{run_id}_{idx}_{type}.jpg 로 저장
+    DEFECT_CROP_SAVE_ENABLED: bool = Field(default=True)
+    DEFECT_CROP_PADDING_PX: int = Field(default=8, ge=0, le=200)
+
+    # ── 시계열 alarm ─────────────────────────────────────────────────────────
+    # 직전 N회 검사 중 동일 위치(±tol px) 동일 타입 결함이 M회 이상 검출되면 alarm=True
+    DEFECT_ALARM_ENABLED: bool = Field(default=True)
+    DEFECT_ALARM_WINDOW_N: int = Field(default=5, ge=2, le=50)
+    DEFECT_ALARM_THRESHOLD_M: int = Field(default=3, ge=2, le=50)
+    DEFECT_ALARM_POSITION_TOL_PX: float = Field(default=50.0, ge=1.0, le=1000.0)
+
     # ── 정렬 / 각도 보정 ───────────────────────────────────────────────────────
     # 피듀셜 2개로 측정한 기울기가 이 각도(°)를 넘으면 FAIL (오탐·이상 배치로 간주, 보정 안 함)
     MAX_DESKEW_ANGLE_DEG: float = Field(default=45.0)

@@ -11,6 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+# torch/torchvision 은 CPU-only 인덱스에서 먼저 설치 — NVIDIA CUDA 라이브러리(약 2GB) 다운로드 회피.
+# 이후 -r requirements.txt 는 이미 만족된 버전을 그대로 사용한다.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.5.1 torchvision==0.20.1
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .

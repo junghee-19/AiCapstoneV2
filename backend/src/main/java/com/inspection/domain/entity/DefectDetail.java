@@ -44,21 +44,21 @@ public class DefectDetail {
     @Column(name = "confidence", nullable = false)
     private Float confidence;
 
-    // ── 바운딩 박스 좌표 (원본 이미지 픽셀 기준) ──────────────────────────
+    // ── 바운딩 박스 좌표 (원본 이미지 픽셀 기준, 소수점 보존) ──────────────
 
-    /** 바운딩 박스 좌상단 X 좌표 (픽셀) */
+    /** 바운딩 박스 좌상단 X 좌표 (픽셀, 소수점) */
     @Column(name = "bbox_x", nullable = false)
-    private Integer bboxX;
+    private Float bboxX;
 
-    /** 바운딩 박스 좌상단 Y 좌표 (픽셀) */
+    /** 바운딩 박스 좌상단 Y 좌표 (픽셀, 소수점) */
     @Column(name = "bbox_y", nullable = false)
-    private Integer bboxY;
+    private Float bboxY;
 
-    /** 바운딩 박스 너비 (픽셀) */
+    /** 바운딩 박스 너비 (픽셀, 소수점) */
     @Column(name = "bbox_width", nullable = false)
-    private Integer bboxWidth;
+    private Float bboxWidth;
 
-    /** 바운딩 박스 높이 (픽셀) */
+    /** 바운딩 박스 높이 (픽셀, 소수점) */
     @Column(name = "bbox_height", nullable = false)
-    private Integer bboxHeight;
+    private Float bboxHeight;
 }

@@ -35,11 +35,12 @@ class BoundingBox(BaseModel):
     """
     YOLO 탐지 결과 바운딩 박스 좌표.
     좌상단 (x, y) 기준, 너비·높이 형식 (XYWH).
+    YOLO 원본 float 좌표를 정수로 변환하지 않고 그대로 보존한다.
     """
-    x: int = Field(ge=0, description="좌상단 X 좌표 (픽셀)")
-    y: int = Field(ge=0, description="좌상단 Y 좌표 (픽셀)")
-    width: int = Field(gt=0, description="너비 (픽셀)")
-    height: int = Field(gt=0, description="높이 (픽셀)")
+    x: float = Field(ge=0.0, description="좌상단 X 좌표 (픽셀, 소수점)")
+    y: float = Field(ge=0.0, description="좌상단 Y 좌표 (픽셀, 소수점)")
+    width: float = Field(gt=0.0, description="너비 (픽셀, 소수점)")
+    height: float = Field(gt=0.0, description="높이 (픽셀, 소수점)")
 
 
 # ── 탐지 결과 단위 ────────────────────────────────────────────────────────────
@@ -54,14 +55,14 @@ class DetectionItem(BaseModel):
     bbox: BoundingBox = Field(description="바운딩 박스 좌표")
 
     @property
-    def center_x(self) -> int:
-        """바운딩 박스 중심 X 좌표 (정렬 계산에 사용)"""
-        return self.bbox.x + self.bbox.width // 2
+    def center_x(self) -> float:
+        """바운딩 박스 중심 X 좌표 (소수점 보존)."""
+        return self.bbox.x + self.bbox.width / 2.0
 
     @property
-    def center_y(self) -> int:
-        """바운딩 박스 중심 Y 좌표 (정렬 계산에 사용)"""
-        return self.bbox.y + self.bbox.height // 2
+    def center_y(self) -> float:
+        """바운딩 박스 중심 Y 좌표 (소수점 보존)."""
+        return self.bbox.y + self.bbox.height / 2.0
 
 
 # ── 정렬 검사 결과 ────────────────────────────────────────────────────────────
@@ -96,11 +97,15 @@ class InspectionPacket(BaseModel):
     # 최종 판정 결과
     result: InspectionResult
 
-    # 피듀셜 마크 좌표 (탐지 실패 시 None)
-    fiducial1_x: Optional[int] = Field(default=None, serialization_alias="fiducial1X")
-    fiducial1_y: Optional[int] = Field(default=None, serialization_alias="fiducial1Y")
-    fiducial2_x: Optional[int] = Field(default=None, serialization_alias="fiducial2X")
-    fiducial2_y: Optional[int] = Field(default=None, serialization_alias="fiducial2Y")
+    # 피듀셜 마크 좌표 (탐지 실패 시 None) — 소수점 보존
+    fiducial1_x: Optional[float] = Field(default=None, serialization_alias="fiducial1X")
+    fiducial1_y: Optional[float] = Field(default=None, serialization_alias="fiducial1Y")
+    fiducial2_x: Optional[float] = Field(default=None, serialization_alias="fiducial2X")
+    fiducial2_y: Optional[float] = Field(default=None, serialization_alias="fiducial2Y")
+
+    # 시계열 alarm: 직전 N회 검사 중 동일 위치 결함이 M회 이상 반복되면 true
+    alarm: bool = Field(default=False, serialization_alias="alarm")
+    alarm_reason: Optional[str] = Field(default=None, serialization_alias="alarmReason")
 
     # Stage1 YOLO 탐지 신뢰도 (0~1, 없으면 None)
     fiducial1_confidence: Optional[float] = Field(default=None, serialization_alias="fiducial1Confidence")
@@ -136,10 +141,18 @@ class DefectPayload(BaseModel):
     """InspectionPacket.defects 배열의 각 요소 — 결함 단위 페이로드."""
     defect_type: str = Field(serialization_alias="defectType")
     confidence: float = Field(serialization_alias="confidence")
-    bbox_x: int = Field(serialization_alias="bboxX")
-    bbox_y: int = Field(serialization_alias="bboxY")
-    bbox_width: int = Field(serialization_alias="bboxWidth")
-    bbox_height: int = Field(serialization_alias="bboxHeight")
+    # bbox 좌표는 YOLO 원본 float 그대로 보존 (int 변환 없음)
+    bbox_x: float = Field(serialization_alias="bboxX")
+    bbox_y: float = Field(serialization_alias="bboxY")
+    bbox_width: float = Field(serialization_alias="bboxWidth")
+    bbox_height: float = Field(serialization_alias="bboxHeight")
+
+    # 중심 좌표 — alarm 비교용 보조 필드 (없으면 bbox에서 파생)
+    center_x: Optional[float] = Field(default=None, serialization_alias="centerX")
+    center_y: Optional[float] = Field(default=None, serialization_alias="centerY")
+
+    # per-defect 크롭 보존 — captures/defects/ 아래 파일명 (없으면 미저장)
+    crop_path: Optional[str] = Field(default=None, serialization_alias="cropPath")
 
     model_config = {"populate_by_name": True}
 

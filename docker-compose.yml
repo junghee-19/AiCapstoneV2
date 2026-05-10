@@ -38,13 +38,28 @@ services:
     container_name: aicapstone-frontend
     depends_on:
       - backend
+      - edge
     environment:
       VITE_API_PROXY_TARGET: http://backend:8080
-      # 라즈베리파이에서 edge를 따로 실행할 때 사용할 주소
-      # 예) VITE_EDGE_CAPTURE_URL=http://192.168.0.23:8000
-      VITE_EDGE_CAPTURE_URL: ${VITE_EDGE_CAPTURE_URL}
+      # 로컬 compose에서는 edge 컨테이너로 우회. 라즈베리파이로 보낼 때만 외부에서 덮어쓴다.
+      VITE_EDGE_CAPTURE_URL: ${VITE_EDGE_CAPTURE_URL:-http://edge:8000}
     ports:
       - "5173:5173"
+
+  edge:
+    image: aicapstone-edge:local
+    build:
+      context: ./edge
+    container_name: aicapstone-edge
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      SERVER_BASE_URL: http://backend:8080
+      ENVIRONMENT: development
+      TZ: Asia/Seoul
+    ports:
+      - "8000:8000"
 
 volumes:
   mysql_data:

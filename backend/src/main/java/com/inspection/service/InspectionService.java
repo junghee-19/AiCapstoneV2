@@ -63,7 +63,7 @@ public class InspectionService {
         log.info("[검사 수신] 디바이스: {}, 결과: {}, 시각: {}",
                 dto.getDeviceId(), dto.getResult(), dto.getInspectedAt());
 
-        // 1. 요청 DTO → InspectionLog 엔티티 구성
+        // 1. 요청 DTO → InspectionLog 엔티티 구성 (float 좌표 그대로 저장)
         InspectionLog log = InspectionLog.builder()
                 .deviceId(dto.getDeviceId())
                 .result(InspectionResult.valueOf(dto.getResult()))
