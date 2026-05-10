@@ -11,10 +11,15 @@
  */
 
 import { useState, useMemo } from 'react'
-import { Search, Filter, Download } from 'lucide-react'
+import { Search, Filter, Download, Trash2, Loader2 } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import InspectionTable from '@/components/inspection/InspectionTable'
 import { useAllInspections } from '@/hooks/useInspectionData'
+import {
+  deleteAllInspections,
+  deleteInspectionsByPeriod,
+} from '@/api/inspectionApi'
 import type { InspectionResultType } from '@/types/inspection'
 
 // ── 결과 필터 버튼 ────────────────────────────────────────────────────────────
@@ -92,6 +97,7 @@ function downloadCsv(data: ReturnType<typeof useAllInspections>['data']) {
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
 export default function HistoryPage() {
+  const queryClient = useQueryClient()
   const { data: allLogs = [], isLoading } = useAllInspections()
 
   /* 결과 필터 상태 */
@@ -101,6 +107,50 @@ export default function HistoryPage() {
   const today = getLocalDateString()
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo,   setDateTo]   = useState(today)
+
+  // ── 삭제 mutation ───────────────────────────────────────────────────────────
+
+  const invalidateInspections = () =>
+    queryClient.invalidateQueries({ queryKey: ['inspections'] })
+
+  const deleteAllMutation = useMutation({
+    mutationFn: deleteAllInspections,
+    onSuccess: invalidateInspections,
+    onError: (e: Error) => window.alert(e.message || '전체 삭제에 실패했습니다.'),
+  })
+
+  const deletePeriodMutation = useMutation({
+    mutationFn: ({ from, to }: { from: string; to: string }) =>
+      deleteInspectionsByPeriod(from, to),
+    onSuccess: (res) => {
+      invalidateInspections()
+      window.alert(`기간 내 ${res.deletedCount}건이 삭제되었습니다.`)
+    },
+    onError: (e: Error) => window.alert(e.message || '기간 삭제에 실패했습니다.'),
+  })
+
+  const handleDeleteAll = () => {
+    if (!window.confirm('전체 검사 이력과 결함 기록을 모두 삭제합니다. 계속할까요?')) return
+    deleteAllMutation.mutate()
+  }
+
+  const handleDeletePeriod = () => {
+    if (!dateFrom || !dateTo) {
+      window.alert('시작일과 종료일을 모두 선택해 주세요.')
+      return
+    }
+    if (dateFrom > dateTo) {
+      window.alert('시작일이 종료일보다 늦을 수 없습니다.')
+      return
+    }
+    if (!window.confirm(`${dateFrom} ~ ${dateTo} 기간의 검사 이력을 삭제합니다. 계속할까요?`)) {
+      return
+    }
+    deletePeriodMutation.mutate({
+      from: `${dateFrom}T00:00:00`,
+      to:   `${dateTo}T23:59:59`,
+    })
+  }
 
   /* 필터 적용된 데이터 계산 (useMemo로 불필요한 재연산 방지) */
   const filteredLogs = useMemo(() => {
@@ -127,20 +177,50 @@ export default function HistoryPage() {
     <div className="p-6 space-y-5 overflow-y-auto h-full">
 
       {/* 페이지 제목 */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-lg font-bold text-white">검사 이력</h2>
-          <p className="text-xs text-gray-500 mt-0.5">전체 검사 기록 조회 및 결함 상세 확인</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            전체 검사 기록 조회 및 결함 상세 확인 · 보관기간 60일 (자동 삭제)
+          </p>
         </div>
 
-        {/* CSV 내보내기 버튼 */}
-        <button
-          onClick={() => downloadCsv(filteredLogs)}
-          className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg text-xs font-medium transition-colors"
-        >
-          <Download size={14} />
-          CSV 내보내기
-        </button>
+        {/* 액션 버튼 그룹: CSV / 기간 삭제 / 전체 삭제 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => downloadCsv(filteredLogs)}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            <Download size={14} />
+            CSV 내보내기
+          </button>
+
+          <button
+            onClick={handleDeletePeriod}
+            disabled={deletePeriodMutation.isPending}
+            className="flex items-center gap-2 px-3 py-2 bg-red-900/40 hover:bg-red-900/60 border border-red-900/50 text-red-300 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            {deletePeriodMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Trash2 size={14} />
+            )}
+            {deletePeriodMutation.isPending ? '삭제 중...' : '기간 삭제'}
+          </button>
+
+          <button
+            onClick={handleDeleteAll}
+            disabled={deleteAllMutation.isPending}
+            className="flex items-center gap-2 px-3 py-2 bg-red-700/60 hover:bg-red-700/80 border border-red-600/60 text-red-100 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            {deleteAllMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Trash2 size={14} />
+            )}
+            {deleteAllMutation.isPending ? '삭제 중...' : '전체 삭제'}
+          </button>
+        </div>
       </div>
 
       {/* 필터 영역 */}

@@ -3,6 +3,7 @@ package com.inspection;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * PCB 비전 검사 중앙 서버 메인 애플리케이션
@@ -17,6 +18,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
  */
 @SpringBootApplication
 @EnableJpaAuditing
+@EnableScheduling
 public class InspectionApplication {
 
     public static void main(String[] args) {

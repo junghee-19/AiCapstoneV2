@@ -3,6 +3,7 @@ package com.inspection.repository;
 import com.inspection.domain.entity.InspectionLog;
 import com.inspection.domain.enums.InspectionResult;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -62,4 +63,22 @@ public interface InspectionLogRepository extends JpaRepository<InspectionLog, Lo
      * @param deviceId 디바이스 식별자
      */
     List<InspectionLog> findByDeviceIdOrderByInspectedAtDesc(String deviceId);
+
+    // ── 벌크 삭제 (자식 DefectDetail은 호출 측에서 먼저 정리) ───────────────────
+
+    /**
+     * 지정 기간 내 검사 이력을 일괄 삭제 (HistoryPage 기간 삭제용).
+     * cascade가 작동하지 않으므로 자식 DefectDetail을 먼저 삭제해야 한다.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM InspectionLog l WHERE l.inspectedAt BETWEEN :from AND :to")
+    int deleteByInspectedAtBetween(@Param("from") LocalDateTime from,
+                                   @Param("to") LocalDateTime to);
+
+    /**
+     * 지정 시각보다 오래된 검사 이력을 일괄 삭제 (60일 보관 정책 자동 정리용).
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM InspectionLog l WHERE l.inspectedAt < :threshold")
+    int deleteByInspectedAtBefore(@Param("threshold") LocalDateTime threshold);
 }

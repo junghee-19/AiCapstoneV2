@@ -14,14 +14,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Camera, FolderOpen, Loader2, Radio, Trash2 } from 'lucide-react'
+import { Camera, FolderOpen, Loader2, Radio } from 'lucide-react'
 import StatCardGroup from '@/components/dashboard/StatCard'
 import PassFailChart from '@/components/dashboard/PassFailChart'
 import FailRateTrendChart from '@/components/dashboard/FailRateTrendChart'
 import TrendChart from '@/components/dashboard/TrendChart'
 import InspectionTable from '@/components/inspection/InspectionTable'
 import {
-  deleteAllInspections,
   fetchEdgeDevices,
   inspectImage,
   triggerEdgeInspection,
@@ -72,17 +71,6 @@ export default function DashboardPage() {
     },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteAllInspections,
-    onSuccess: () => {
-      setActionMsg({ type: 'ok', text: '검사 이력이 모두 삭제되었습니다.' })
-      invalidateInspections()
-    },
-    onError: (e: Error) => {
-      setActionMsg({ type: 'err', text: e.message || '삭제 실패' })
-    },
-  })
-
   const instantInspectMutation = useMutation({
     mutationFn: triggerEdgeInspection,
     onSuccess: (command) => {
@@ -105,17 +93,6 @@ export default function DashboardPage() {
     }
     setActionMsg(null)
     instantInspectMutation.mutate(selectedDeviceId)
-  }
-
-  const handleDeleteHistory = () => {
-    if (
-      !window.confirm(
-        '저장된 검사 이력과 결함 기록을 모두 삭제합니다. 계속할까요?'
-      )
-    ) {
-      return
-    }
-    deleteMutation.mutate()
   }
 
   return (
@@ -168,19 +145,6 @@ export default function DashboardPage() {
                 <Camera size={16} />
               )}
               지금 검사
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteHistory}
-              disabled={deleteMutation.isPending}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800 hover:bg-red-950/80 border border-gray-700 hover:border-red-900 text-gray-200 disabled:opacity-50 transition-colors"
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Trash2 size={16} />
-              )}
-              이력 전체 삭제
             </button>
           </div>
 

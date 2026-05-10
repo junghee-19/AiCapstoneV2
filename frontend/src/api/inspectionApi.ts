@@ -100,6 +100,17 @@ export const deleteAllInspections = async (): Promise<void> => {
   await apiClient.delete('/inspections')
 }
 
+export const deleteInspectionsByPeriod = async (
+  from: string,
+  to: string
+): Promise<{ deletedCount: number }> => {
+  const { data } = await apiClient.delete<{ deletedCount: number }>(
+    '/inspections/period',
+    { params: { from, to } }
+  )
+  return data
+}
+
 export const fetchEdgeDevices = async (): Promise<EdgeDevice[]> => {
   const { data } = await apiClient.get<EdgeDevice[]>('/edge/devices')
   return data
