@@ -12,7 +12,8 @@ services:
     ports:
       - "${EDGE_API_PORT:-8000}:8000"
     devices:
-      - "${CAMERA_DEVICE:-/dev/video1}:${CAMERA_DEVICE:-/dev/video1}"
+      # Override CAMERA_DEVICE from the shell or project-root .env when the camera is not /dev/video0.
+      - "${CAMERA_DEVICE:-/dev/video0}:${CAMERA_DEVICE:-/dev/video0}"
     volumes:
       - ./edge/weights:/app/weights
       - ./edge/captures:/app/captures
