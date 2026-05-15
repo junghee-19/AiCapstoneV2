@@ -9,6 +9,7 @@ ultralytics==8.2.18          # YOLOv8
 # 라즈베리파이에서 검증된 조합으로 고정
 torch==2.5.1
 torchvision==0.20.1
+# PatchCore Anomaly Detection — 학습은 Colab GPU, Pi 는 TorchScript 추론 (torch 재사용)
 
 # ===== 데이터 모델 및 검증 =====
 pydantic==2.7.1

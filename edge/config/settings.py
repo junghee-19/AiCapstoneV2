@@ -122,6 +122,24 @@ class Settings(BaseSettings):
     # fallback_default 정책에서 사용할 기본 보드 타입 키
     DEFAULT_BOARD_TYPE: Optional[str] = Field(default=None)
 
+    # ── 정상 샘플 위치 검증 (Position Check) ─────────────────────────────────
+    # 활성화 + 레퍼런스 등록되어 있으면 Stage2 후 위치 매칭 → 누락 시 FAIL
+    REFERENCE_CHECK_ENABLED: bool = Field(default=False)
+    # 정상 샘플 프로파일 JSON 파일 (edge/ 기준 상대 경로 허용)
+    REFERENCE_PROFILE_PATH: str = Field(default="config/reference_profile.json")
+    # 변환된 예상 위치 ± 이 거리 안에 같은 클래스 검출이 있어야 OK (px)
+    REFERENCE_MATCH_TOLERANCE_PX: float = Field(default=80.0, gt=0.0)
+
+    # ── PatchCore Anomaly Detection ──────────────────────────────────────────
+    # 활성화 + 모델/coreset 파일 존재 시 Stage2 후 추론 → 임계값 초과 시 FAIL
+    PATCHCORE_ENABLED: bool = Field(default=False)
+    # TorchScript 백본 모델 (.pt) — Colab 학습 후 export
+    PATCHCORE_MODEL_PATH: str = Field(default="weights/patchcore_backbone.pt")
+    PATCHCORE_CORESET_PATH: str = Field(default="weights/patchcore_coreset.npy")
+    PATCHCORE_META_PATH: str = Field(default="weights/patchcore_meta.json")
+    # None 이면 meta.json 의 threshold_mean_plus_3sigma 사용. 수동 오버라이드 시 양수 값.
+    PATCHCORE_SCORE_THRESHOLD: Optional[float] = Field(default=None)
+
     # ── FastAPI 서버 포트 ────────────────────────────────────────────────────
     EDGE_API_PORT: int = Field(default=8000)
 

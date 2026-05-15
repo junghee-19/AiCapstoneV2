@@ -215,6 +215,7 @@ board_profiles: dict[str, dict[str, Any]] = {}
 board_detector_cache: dict[str, YoloDetector] = {}
 ws_stop_event: Optional[asyncio.Event] = None
 ws_task: Optional[asyncio.Task[None]] = None
+_patchcore_detector: Any = None  # inference.anomaly_patchcore.PatchCoreDetector — lazy load
 
 
 def _resolve_edge_relative_path(path_like: str) -> Path:
@@ -730,10 +731,70 @@ def _run_production_vision_pipeline(
             if missing_payloads:
                 logger.warning("[카운트판정] expected_counts 불일치로 FAIL 처리 (%d건)", len(missing_payloads))
 
+        # ── 정상 샘플 기준 위치 검증 (Position Check) ─────────────────────────
+        # 레퍼런스 등록 + REFERENCE_CHECK_ENABLED 일 때만 작동.
+        # 레퍼런스의 부품 위치를 현재 이미지로 투영 → 매칭 없으면 MISSING 추가.
+        if settings.REFERENCE_CHECK_ENABLED:
+            from inference.reference_check import load_reference, check_missing_components
+            ref_path = Path(settings.REFERENCE_PROFILE_PATH)
+            if not ref_path.is_absolute():
+                ref_path = _EDGE_DIR / ref_path
+            reference = load_reference(ref_path)
+            if reference is None:
+                logger.warning("[위치검증] 레퍼런스 미등록 — 위치 검증 건너뜀: %s", ref_path)
+            else:
+                position_missing = check_missing_components(
+                    reference,
+                    current_alignment=alignment,
+                    current_detections=defect_items,
+                    tolerance_px=settings.REFERENCE_MATCH_TOLERANCE_PX,
+                )
+                if position_missing:
+                    logger.warning(
+                        "[위치검증] 누락 부품 %d개 감지 — FAIL 처리",
+                        len(position_missing),
+                    )
+                    missing_payloads.extend(position_missing)
+
+        # ── PatchCore Anomaly Detection ───────────────────────────────────────
+        # 정렬된 이미지에서 정상 패치 분포와의 거리 → 결함 영역 검출.
+        # 학습은 외부 (Colab) — Pi 는 ONNX 추론만.
+        anomaly_payloads: list[DefectPayload] = []
+        if settings.PATCHCORE_ENABLED:
+            global _patchcore_detector
+            if _patchcore_detector is None:
+                from inference.anomaly_patchcore import get_detector
+                model_p = _resolve_edge_relative_path(settings.PATCHCORE_MODEL_PATH)
+                cs_p = _resolve_edge_relative_path(settings.PATCHCORE_CORESET_PATH)
+                meta_p = _resolve_edge_relative_path(settings.PATCHCORE_META_PATH)
+                _patchcore_detector = get_detector(
+                    model_p, cs_p, meta_p,
+                    score_threshold=settings.PATCHCORE_SCORE_THRESHOLD,
+                )
+
+            if _patchcore_detector is not None:
+                # Stage2 입력 이미지 그대로 사용 (정합된 frame)
+                result = _patchcore_detector.infer(stage2_source_image)
+                if result["is_anomaly"]:
+                    for x, y, w, h, score in result["boxes"]:
+                        anomaly_payloads.append(DefectPayload(
+                            defect_type=f"ANOMALY:score={score:.2f},threshold={result['threshold']:.2f}",
+                            confidence=min(1.0, float(score) / max(1e-3, float(result["threshold"]))),
+                            bbox_x=float(x),
+                            bbox_y=float(y),
+                            bbox_width=float(w),
+                            bbox_height=float(h),
+                        ))
+                    logger.warning(
+                        "[PatchCore] anomaly %d영역 감지 — FAIL 처리 (max score=%.2f)",
+                        len(anomaly_payloads),
+                        result["score"],
+                    )
+
         f1c, f2c = _fiducial_confidences(alignment)
-        if missing_payloads:
+        if missing_payloads or anomaly_payloads:
             final_result = InspectionResult.FAIL
-        all_defects = defect_payloads + missing_payloads
+        all_defects = defect_payloads + missing_payloads + anomaly_payloads
         packet = _build_packet(
             result=final_result,
             f1x=f1x, f1y=f1y, f2x=f2x, f2y=f2y,

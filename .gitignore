@@ -9,6 +9,13 @@ venv/
 edge/.env
 edge/weights/*.pt
 edge/weights/*.onnx
+# PatchCore 학습 산출물 — Colab 에서 생성 후 수동 배포
+edge/weights/*.npy
+edge/weights/patchcore_meta.json
+# Position Check 등록 시 자동 생성 — 운영자가 정상 샘플로 등록
+edge/config/reference_profile.json
+# PatchCore 학습용 정상 사진 (개인 데이터)
+training_data/
 edge/captures/
 
 # ===== Java / Maven (Backend) =====

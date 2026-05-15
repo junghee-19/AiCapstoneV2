@@ -480,6 +480,130 @@ async def inspect_from_file(
     }
 
 
+# ── 정상 샘플 위치 검증 (Position Check) ────────────────────────────────────
+
+class ReferenceFromFileBody(BaseModel):
+    """edge/captures 아래 정상 샘플 이미지로 레퍼런스 등록."""
+
+    path: str = Field(..., min_length=1, description="captures/ 기준 상대 경로")
+
+
+def _resolve_reference_path() -> Path:
+    """settings.REFERENCE_PROFILE_PATH 를 edge/ 기준 절대 경로로 변환."""
+    from main import _EDGE_DIR
+    p = Path(settings.REFERENCE_PROFILE_PATH)
+    if p.is_absolute():
+        return p
+    return (_EDGE_DIR / p).resolve()
+
+
+@router.post("/reference/from-file", summary="정상 샘플로 위치 검증 레퍼런스 등록")
+async def register_reference_from_file(body: ReferenceFromFileBody) -> dict[str, Any]:
+    """지정된 정상 PCB 이미지로 검사 1회 실행 → fiducial + 부품 좌표를 레퍼런스 JSON 으로 저장."""
+    from inference.model_compare import resolve_safe_inspection_source_image
+    from inference.reference_check import save_reference, packet_components_for_save
+    from models.schemas import AlignmentResult, BoundingBox, DetectionItem
+
+    try:
+        src = resolve_safe_inspection_source_image(body.path.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    if cv2.imread(str(src)) is None:
+        raise HTTPException(status_code=400, detail="이미지를 디코딩할 수 없습니다.")
+
+    try:
+        import main as main_mod
+        if getattr(main_mod, "detector", None) is None:
+            raise HTTPException(status_code=503, detail="YOLO 모델이 로드되지 않았습니다.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"모델 상태 확인 실패: {e}") from e
+
+    # 검사 파이프라인 실행해 packet 받음
+    from main import run_inspection_pipeline_from_source_file
+    packet = await run_inspection_pipeline_from_source_file(body.path.strip(), None)
+    if packet is None:
+        raise HTTPException(status_code=500, detail="검사 실행 실패 — 레퍼런스 등록 불가.")
+
+    # AlignmentResult 재구성 (packet 에는 좌표만 있어서)
+    f1_item = None
+    f2_item = None
+    if packet.fiducial1_x is not None and packet.fiducial1_y is not None:
+        f1_item = DetectionItem(
+            defect_type="fiducial",
+            confidence=packet.fiducial1_confidence or 1.0,
+            bbox=BoundingBox(
+                x=max(0.0, packet.fiducial1_x - 5.0),
+                y=max(0.0, packet.fiducial1_y - 5.0),
+                width=10.0, height=10.0,
+            ),
+        )
+    if packet.fiducial2_x is not None and packet.fiducial2_y is not None:
+        f2_item = DetectionItem(
+            defect_type="fiducial",
+            confidence=packet.fiducial2_confidence or 1.0,
+            bbox=BoundingBox(
+                x=max(0.0, packet.fiducial2_x - 5.0),
+                y=max(0.0, packet.fiducial2_y - 5.0),
+                width=10.0, height=10.0,
+            ),
+        )
+    if f1_item is None or f2_item is None:
+        raise HTTPException(status_code=400, detail="fiducial 2개가 모두 검출돼야 레퍼런스 등록 가능합니다.")
+
+    alignment = AlignmentResult(
+        is_aligned=True,
+        fiducial1=f1_item,
+        fiducial2=f2_item,
+        angle_error_deg=packet.angle_error_deg or 0.0,
+    )
+
+    profile_path = _resolve_reference_path()
+    try:
+        saved = save_reference(
+            profile_path,
+            device_id=packet.device_id,
+            image_path=packet.image_path,
+            alignment=alignment,
+            detections=packet_components_for_save(packet),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return {
+        "message": "레퍼런스 등록 완료",
+        "profile_path": str(profile_path),
+        "device_id": saved["device_id"],
+        "fiducial1": saved["fiducial1"],
+        "fiducial2": saved["fiducial2"],
+        "components_count": len(saved["components"]),
+    }
+
+
+@router.get("/reference", summary="현재 등록된 레퍼런스 프로파일 조회")
+async def get_reference() -> dict[str, Any]:
+    from inference.reference_check import load_reference
+
+    profile_path = _resolve_reference_path()
+    ref = load_reference(profile_path)
+    if ref is None:
+        raise HTTPException(status_code=404, detail="등록된 레퍼런스가 없습니다.")
+    return {"profile_path": str(profile_path), "reference": ref}
+
+
+@router.delete("/reference", summary="등록된 레퍼런스 삭제")
+async def delete_reference() -> dict[str, Any]:
+    profile_path = _resolve_reference_path()
+    if profile_path.exists():
+        profile_path.unlink()
+        return {"message": "레퍼런스 삭제 완료", "profile_path": str(profile_path)}
+    raise HTTPException(status_code=404, detail="삭제할 레퍼런스가 없습니다.")
+
+
 @router.post("/inspect/dummy", summary="더미 데이터 전송 테스트")
 async def send_dummy_inspection() -> dict[str, Any]:
     """
