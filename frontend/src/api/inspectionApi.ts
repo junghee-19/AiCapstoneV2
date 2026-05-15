@@ -150,6 +150,12 @@ export const fetchDatasetImages = async (): Promise<DatasetImage[]> => {
   return data
 }
 
+export const deleteDatasetImage = async (image: DatasetImage): Promise<void> => {
+  await apiClient.delete(
+    `/dataset-images/${encodeURIComponent(image.deviceId)}/${encodeURIComponent(image.session)}/${encodeURIComponent(image.filename)}`
+  )
+}
+
 /**
  * 이미지 업로드 → Spring 백엔드 /api/inspections (multipart)
  * 백엔드가 inference-service로 forward → DB 저장 후 응답.

@@ -8,14 +8,12 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Server, Cpu, HardDrive, Wifi, WifiOff, Sun, Moon, Camera, Download } from 'lucide-react'
+import { Server, Cpu, HardDrive, Wifi, WifiOff, Sun, Moon, Camera } from 'lucide-react'
 import clsx from 'clsx'
 import {
-  fetchDatasetImages,
   fetchEdgeDevices,
   fetchStats,
   triggerDatasetCapture,
-  type DatasetImage,
   type EdgeDevice,
 } from '@/api/inspectionApi'
 import { useTheme } from '@/hooks/useTheme'
@@ -226,80 +224,6 @@ function DeviceManagementSection() {
   )
 }
 
-// ── 3. 데이터셋 이미지 ───────────────────────────────────────────────────────
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes)) return '—'
-  if (bytes < 1024) return `${bytes}B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)}MB`
-}
-
-function DatasetImageSection() {
-  const imagesQ = useQuery({
-    queryKey: ['dataset-images'],
-    queryFn: fetchDatasetImages,
-    refetchInterval: 10_000,
-  })
-  const images: DatasetImage[] = imagesQ.data ?? []
-
-  return (
-    <SectionCard
-      icon={<Camera size={16} />}
-      title="라벨링 데이터셋 이미지"
-      right={<span className="text-xs text-gray-500">서버 보관 {images.length}장</span>}
-    >
-      {imagesQ.isLoading ? (
-        <p className="text-xs text-gray-500 py-6 text-center">데이터셋 이미지 불러오는 중...</p>
-      ) : images.length === 0 ? (
-        <p className="text-xs text-gray-500 py-6 text-center">
-          아직 서버에 저장된 라벨링 이미지가 없습니다.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-800">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-900/60 text-left">
-                {['세션', '파일명', '디바이스', '크기', '저장 시각', '다운로드'].map((h) => (
-                  <th
-                    key={h}
-                    className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800/60">
-              {images.slice(0, 50).map((image) => (
-                <tr key={`${image.deviceId}-${image.session}-${image.filename}`} className="bg-gray-900/40">
-                  <td className="px-3 py-2 text-xs font-mono text-gray-300">{image.session}</td>
-                  <td className="px-3 py-2 text-xs font-mono text-gray-300">{image.filename}</td>
-                  <td className="px-3 py-2 text-xs font-mono text-gray-400">{image.deviceId}</td>
-                  <td className="px-3 py-2 text-xs text-gray-400">{formatBytes(image.sizeBytes)}</td>
-                  <td className="px-3 py-2 text-xs font-mono text-gray-400">
-                    {formatTimestamp(image.createdAt)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <a
-                      href={image.downloadUrl}
-                      download={image.filename}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-semibold text-gray-200 transition-colors hover:bg-gray-800"
-                    >
-                      <Download size={13} />
-                      받기
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </SectionCard>
-  )
-}
-
 // ── 3. 화면 설정 ──────────────────────────────────────────────────────────────
 
 function DisplaySection() {
@@ -341,7 +265,6 @@ export default function SettingsPage() {
 
       <SystemInfoSection />
       <DeviceManagementSection />
-      <DatasetImageSection />
       <DisplaySection />
     </div>
   )

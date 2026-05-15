@@ -111,6 +111,21 @@ public class DatasetImageStorageService {
         }
     }
 
+    public void delete(String deviceId, String session, String filename) {
+        String safeDeviceId = sanitizeSegment(deviceId, "unknown-device");
+        String safeSession = sanitizeSegment(session, "manual");
+        String safeFilename = sanitizeFilename(filename);
+        Path target = storageDir.resolve(safeDeviceId).resolve(safeSession).resolve(safeFilename).normalize();
+        ensureInsideStorage(target);
+        try {
+            Files.deleteIfExists(target);
+            cleanupEmptyParents(target.getParent());
+            log.info("[데이터셋이미지] 삭제: {}", target);
+        } catch (IOException e) {
+            throw new RuntimeException("데이터셋 이미지 삭제 실패: " + target, e);
+        }
+    }
+
     private DatasetImageDto toDtoFromPath(Path path) {
         Path relative = storageDir.relativize(path);
         String deviceId = relative.getNameCount() >= 1 ? relative.getName(0).toString() : "unknown-device";
@@ -145,6 +160,19 @@ public class DatasetImageStorageService {
     private void ensureInsideStorage(Path path) {
         if (!path.startsWith(storageDir)) {
             throw new IllegalArgumentException("허용되지 않은 데이터셋 이미지 경로: " + path);
+        }
+    }
+
+    private void cleanupEmptyParents(Path dir) throws IOException {
+        Path current = dir;
+        while (current != null && !current.equals(storageDir) && current.startsWith(storageDir)) {
+            try (Stream<Path> children = Files.list(current)) {
+                if (children.findAny().isPresent()) {
+                    return;
+                }
+            }
+            Files.deleteIfExists(current);
+            current = current.getParent();
         }
     }
 

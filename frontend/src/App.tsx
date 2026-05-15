@@ -18,6 +18,7 @@ import Sidebar from '@/components/common/Sidebar'
 import DashboardPage from '@/pages/DashboardPage'
 import HistoryPage from '@/pages/HistoryPage'
 import BoardReferencePage from '@/pages/BoardReferencePage'
+import DatasetImagesPage from '@/pages/DatasetImagesPage'
 import SettingsPage from '@/pages/SettingsPage'
 import { useTheme } from '@/hooks/useTheme'
 
@@ -49,6 +50,9 @@ export default function App() {
 
             {/* 보드 기준(정상 이미지/기대 개수) */}
             <Route path="/board-reference" element={<BoardReferencePage />} />
+
+            {/* 라벨링 데이터셋 이미지 */}
+            <Route path="/dataset-images" element={<DatasetImagesPage />} />
 
             {/* 설정 */}
             <Route path="/settings" element={<SettingsPage />} />

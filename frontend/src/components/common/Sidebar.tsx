@@ -6,7 +6,7 @@
  */
 
 import { NavLink } from 'react-router-dom'
-import { BarChart2, ClipboardList, Layers3, Settings } from 'lucide-react'
+import { BarChart2, ClipboardList, Images, Layers3, Settings } from 'lucide-react'
 import clsx from 'clsx'
 
 /** 네비게이션 메뉴 항목 정의 */
@@ -27,6 +27,12 @@ const NAV_ITEMS = [
     to:    '/board-reference',
     icon:  Layers3,
     label: 'PCB 정보',
+    end:   false,
+  },
+  {
+    to:    '/dataset-images',
+    icon:  Images,
+    label: '데이터셋',
     end:   false,
   },
   {

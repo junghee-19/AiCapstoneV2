@@ -61,4 +61,14 @@ public class DatasetImageController {
                         "attachment; filename=\"" + resource.getFilename() + "\"")
                 .body(resource);
     }
+
+    @DeleteMapping("/{deviceId}/{session}/{filename}")
+    public ResponseEntity<Void> deleteDatasetImage(
+            @PathVariable String deviceId,
+            @PathVariable String session,
+            @PathVariable String filename
+    ) {
+        datasetImageStorageService.delete(deviceId, session, filename);
+        return ResponseEntity.noContent().build();
+    }
 }
