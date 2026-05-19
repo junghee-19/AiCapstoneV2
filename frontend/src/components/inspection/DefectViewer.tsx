@@ -6,7 +6,7 @@ import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { X, ImageOff, AlertCircle } from 'lucide-react'
 import { useInspectionById } from '@/hooks/useInspectionData'
 import type { InspectionLog } from '@/types/inspection'
-import { DEFECT_COLOR, defectDisplayName } from '@/types/inspection'
+import { defectDisplayName, defectColor } from '@/types/inspection'
 
 // ── 이미지 로드 전 기본값 (로드 후 naturalWidth/Height 사용) ───────────────
 const DEFAULT_REF_WIDTH = 1920
@@ -402,7 +402,7 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                             h={d.bboxHeight}
                             label={defectDisplayName(d.defectType)}
                             confidence={d.confidence}
-                            color={DEFECT_COLOR[d.defectType] ?? '#f87171'}
+                            color={defectColor(d.defectType)}
                             scaleX={scaleX}
                             scaleY={scaleY}
                           />
@@ -467,7 +467,7 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                       h={d.bboxHeight}
                       label={defectDisplayName(d.defectType)}
                       confidence={d.confidence}
-                      color={DEFECT_COLOR[d.defectType] ?? '#f87171'}
+                      color={defectColor(d.defectType)}
                       scaleX={scaleX}
                       scaleY={scaleY}
                     />
@@ -573,7 +573,7 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                   {overlayDefects.map((d, i) => {
                     const cx = d.bboxX + Math.round(d.bboxWidth / 2)
                     const cy = d.bboxY + Math.round(d.bboxHeight / 2)
-                    const color = DEFECT_COLOR[d.defectType] ?? '#f87171'
+                    const color = defectColor(d.defectType)
                     // fiducial 좌표 있으면 부품 중심 → 마크까지 거리 계산
                     const distF1 =
                       log?.fiducial1X != null && log?.fiducial1Y != null

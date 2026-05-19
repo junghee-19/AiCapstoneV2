@@ -776,9 +776,30 @@ def _run_production_vision_pipeline(
                 # Stage2 입력 이미지 그대로 사용 (정합된 frame)
                 result = _patchcore_detector.infer(stage2_source_image)
                 if result["is_anomaly"]:
+                    # 위치 컨텍스트: 가장 가까운 검출 부품의 클래스를 라벨에 포함
+                    # (PatchCore 만으론 종류 모름 → 어느 부품 부근인지로 운영자에게 힌트)
+                    detected_centers = [
+                        (d.defect_type.lower(), d.bbox.x + d.bbox.width / 2, d.bbox.y + d.bbox.height / 2)
+                        for d in defect_items
+                        if "fiducial" not in d.defect_type.lower()
+                    ]
+
                     for x, y, w, h, score in result["boxes"]:
+                        cx = x + w / 2.0
+                        cy = y + h / 2.0
+                        nearest_cls = None
+                        nearest_dist = float("inf")
+                        for cls, dcx, dcy in detected_centers:
+                            d = math.hypot(cx - dcx, cy - dcy)
+                            if d < nearest_dist:
+                                nearest_dist = d
+                                nearest_cls = cls
+                        near_part = f"near={nearest_cls or 'unknown'},dist={nearest_dist:.0f}"
                         anomaly_payloads.append(DefectPayload(
-                            defect_type=f"ANOMALY:score={score:.2f},threshold={result['threshold']:.2f}",
+                            defect_type=(
+                                f"ANOMALY:{near_part},"
+                                f"score={score:.2f},threshold={result['threshold']:.2f}"
+                            ),
                             confidence=min(1.0, float(score) / max(1e-3, float(result["threshold"]))),
                             bbox_x=float(x),
                             bbox_y=float(y),

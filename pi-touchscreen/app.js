@@ -22,6 +22,7 @@
     smd_array_block:      '#a78bfa',
     ic_chip:              '#fbbf24',
     edge_connector_zone:  '#f472b6',
+    ANOMALY:              '#dc2626',
   }
   const DEFECT_LABEL = {
     TRACE_OPEN:   '단선',
@@ -38,8 +39,30 @@
     ic_chip:               'IC',
     edge_connector_zone:   '에지 커넥터',
   }
-  const colorOf = (t) => DEFECT_COLOR[t] || '#ef4444'
-  const labelOf = (t) => DEFECT_LABEL[t] || t || '결함'
+  const colorOf = (t) => {
+    if (!t) return '#ef4444'
+    if (t.startsWith('MISSING:')) {
+      const cls = t.split(':')[1]
+      return DEFECT_COLOR[cls] || DEFECT_COLOR[(cls || '').toUpperCase()] || '#f87171'
+    }
+    if (t.startsWith('ANOMALY:')) return DEFECT_COLOR.ANOMALY
+    return DEFECT_COLOR[t] || '#ef4444'
+  }
+  const labelOf = (t) => {
+    if (!t) return '결함'
+    // MISSING:ic_chip:expected=N,...  또는 expected_at=(x,y),nearest=Npx
+    if (t.startsWith('MISSING:')) {
+      const cls = t.split(':')[1]
+      const ko = DEFECT_LABEL[cls] || DEFECT_LABEL[(cls || '').toUpperCase()] || cls
+      return `${ko} 누락`
+    }
+    // ANOMALY:score=3.98,threshold=3.95
+    if (t.startsWith('ANOMALY:')) {
+      const m = t.match(/score=([\d.]+)/)
+      return m ? `검토 필요 (${m[1]})` : '검토 필요'
+    }
+    return DEFECT_LABEL[t] || t
+  }
 
   // ── SSE ────────────────────────────────────────────────────────────────
   const events = new EventSource('/touch/events')

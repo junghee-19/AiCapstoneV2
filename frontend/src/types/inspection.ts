@@ -141,25 +141,52 @@ export const DEFECT_COLOR: Record<string, string> = {
   smd_array_block:      '#a78bfa',  // violet-400
   ic_chip:              '#fbbf24',  // amber-400
   edge_connector_zone:  '#f472b6',  // pink-400
+  // PatchCore Anomaly Detection — 종류 분류 안 됨, 위치만
+  ANOMALY:              '#dc2626',  // red-600
 }
 
 /** 표시용 라벨 (한글 매핑 없으면 원문 그대로) */
 export function defectDisplayName(defectType: string): string {
-  // Edge synthetic missing-count marker:
-  // MISSING:ic_chip:expected=2,detected=1,missing=1
+  // ── Position Check — 카운트 기반 누락 ────────────────────────────────────
+  // 예: "MISSING:ic_chip:expected=2,detected=1,missing=1"
   if (defectType.startsWith('MISSING:')) {
-    const m = defectType.match(
+    const mCount = defectType.match(
       /^MISSING:([^:]+):expected=(\d+),detected=(\d+),missing=(\d+)$/
     )
-    if (m) {
-      const [, rawCls, expected, detected, missing] = m
+    if (mCount) {
+      const [, rawCls, expected, detected, missing] = mCount
       const clsKorean =
         DEFECT_LABEL[rawCls] ??
         DEFECT_LABEL[rawCls.toUpperCase()] ??
         rawCls
       return `${clsKorean} 누락 (기대 ${expected}개, 검출 ${detected}개, 누락 ${missing}개)`
     }
+    // ── Position Check — 위치 기반 누락 ───────────────────────────────────
+    // 예: "MISSING:ic_chip:expected_at=(833,203),nearest=125.5px"
+    const mPos = defectType.match(
+      /^MISSING:([^:]+):expected_at=\(([\d.-]+),([\d.-]+)\),nearest=([\d.]+|inf)px$/
+    )
+    if (mPos) {
+      const [, rawCls, x, y, nearest] = mPos
+      const clsKorean =
+        DEFECT_LABEL[rawCls] ??
+        DEFECT_LABEL[rawCls.toUpperCase()] ??
+        rawCls
+      const nearestText = nearest === 'inf' ? '없음' : `${nearest}px`
+      return `${clsKorean} 누락 (예상 (${x}, ${y}), 최근접 ${nearestText})`
+    }
     return defectType.replace('MISSING:', '누락: ')
+  }
+
+  // ── PatchCore Anomaly Detection — 종류 미상 ─────────────────────────────
+  // 예: "ANOMALY:score=3.98,threshold=3.95"
+  if (defectType.startsWith('ANOMALY:')) {
+    const m = defectType.match(/^ANOMALY:score=([\d.]+),threshold=([\d.]+)$/)
+    if (m) {
+      const [, score, threshold] = m
+      return `검토 필요 (점수 ${score} / 기준 ${threshold})`
+    }
+    return defectType.replace('ANOMALY:', '검토 필요: ')
   }
 
   return (
@@ -167,4 +194,17 @@ export function defectDisplayName(defectType: string): string {
     DEFECT_LABEL[defectType.toUpperCase()] ??
     defectType
   )
+}
+
+/** defectType prefix 매핑용 — DEFECT_COLOR 직접 lookup 안 되는 경우 */
+export function defectColor(defectType: string): string {
+  if (defectType.startsWith('MISSING:')) {
+    // 누락 클래스 색을 유지 — MISSING:ic_chip:... → ic_chip 색
+    const cls = defectType.split(':')[1]
+    return DEFECT_COLOR[cls] ?? DEFECT_COLOR[cls?.toUpperCase()] ?? '#f87171'
+  }
+  if (defectType.startsWith('ANOMALY:')) {
+    return DEFECT_COLOR.ANOMALY ?? '#dc2626'
+  }
+  return DEFECT_COLOR[defectType] ?? DEFECT_COLOR[defectType.toUpperCase()] ?? '#f87171'
 }
