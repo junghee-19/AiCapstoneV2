@@ -70,6 +70,7 @@ class CameraCapture:
         self.height = height
         self._cap: Optional[cv2.VideoCapture] = None
         self._capture_lock = Lock()
+        self._focus_lock = Lock()
 
     # ── 카메라 초기화 ──────────────────────────────────────────────────────────
 
