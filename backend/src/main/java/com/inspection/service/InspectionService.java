@@ -10,6 +10,7 @@ import com.inspection.repository.DefectDetailRepository;
 import com.inspection.repository.InspectionLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,6 +42,9 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class InspectionService {
+
+    /** 검사 이력 보관 기간(일). 이 기간을 초과한 레코드는 매일 자동 삭제된다. */
+    public static final int RETENTION_DAYS = 60;
 
     private final InspectionLogRepository inspectionLogRepository;
     private final DefectDetailRepository defectDetailRepository;
@@ -314,7 +318,7 @@ public class InspectionService {
     }
 
     /**
-     * 검사 이력·결함 상세를 모두 삭제한다 (대시보드 초기화용).
+     * 검사 이력·결함 상세를 모두 삭제한다 (검사 이력 페이지 초기화용).
      * FK 순서: defect_detail → inspection_log
      */
     @Transactional
@@ -322,5 +326,39 @@ public class InspectionService {
         defectDetailRepository.deleteAllInBatch();
         inspectionLogRepository.deleteAllInBatch();
         log.warn("[검사 이력] 전체 삭제 완료");
+    }
+
+    // ── 기간 삭제 ────────────────────────────────────────────────────────────
+
+    /**
+     * 지정 기간 내 검사 이력·결함 상세를 일괄 삭제한다 (HistoryPage 기간 삭제).
+     * 자식 → 부모 순으로 명시적 벌크 삭제 (cascade 미작동).
+     */
+    @Transactional
+    public int deleteInspectionsByPeriod(LocalDateTime from, LocalDateTime to) {
+        defectDetailRepository.deleteByInspectionLogInspectedAtBetween(from, to);
+        int removed = inspectionLogRepository.deleteByInspectedAtBetween(from, to);
+        log.warn("[검사 이력] 기간 삭제 완료 ({} ~ {}): {}건", from, to, removed);
+        return removed;
+    }
+
+    // ── 보관기간 자동 정리 ───────────────────────────────────────────────────
+
+    /**
+     * 매일 새벽 3시(서버 로컬 시각)마다 {@value #RETENTION_DAYS}일을 초과한
+     * 검사 이력을 자동으로 삭제한다 (rolling retention).
+     *
+     * cron: 초 분 시 일 월 요일 → "0 0 3 * * *"
+     */
+    @Scheduled(cron = "0 0 3 * * *")
+    @Transactional
+    public void purgeExpiredInspections() {
+        LocalDateTime threshold = LocalDateTime.now().minusDays(RETENTION_DAYS);
+        defectDetailRepository.deleteByInspectionLogInspectedAtBefore(threshold);
+        int removed = inspectionLogRepository.deleteByInspectedAtBefore(threshold);
+        if (removed > 0) {
+            log.info("[자동 정리] {}일 경과 검사 이력 {}건 삭제 (cutoff: {})",
+                    RETENTION_DAYS, removed, threshold);
+        }
     }
 }

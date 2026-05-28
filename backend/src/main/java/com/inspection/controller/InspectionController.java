@@ -40,7 +40,8 @@ import java.util.stream.Collectors;
  * - GET    /api/inspections/recent   → 최근 N건 조회
  * - GET    /api/inspections/stats    → 통계 요약
  * - GET    /api/inspections/period   → 기간 필터 조회
- * - DELETE /api/inspections          → 전체 이력 삭제 (대시보드)
+ * - DELETE /api/inspections          → 전체 이력 삭제 (검사 이력 페이지)
+ * - DELETE /api/inspections/period   → 기간 단위 이력 삭제 (검사 이력 페이지)
  *
  * CORS는 {@link com.inspection.global.CorsConfig} 에서 전역 설정.
  *   - 환경변수 CORS_ALLOWED_ORIGINS 로 허용 origin 목록 주입
@@ -247,7 +248,7 @@ public class InspectionController {
     }
 
     /**
-     * 전체 검사 이력 및 결함 상세 삭제 (운영자 대시보드 초기화).
+     * 전체 검사 이력 및 결함 상세 삭제 (검사 이력 페이지 초기화).
      *
      * <p>DELETE /api/inspections
      */
@@ -256,5 +257,23 @@ public class InspectionController {
         log.warn("[DELETE /api/inspections] 전체 이력 삭제 요청");
         inspectionService.deleteAllInspections();
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 기간 단위 검사 이력 및 결함 상세 삭제.
+     *
+     * <p>DELETE /api/inspections/period?from=2026-03-01T00:00:00&to=2026-03-31T23:59:59
+     *
+     * @param from 시작 시각 (포함)
+     * @param to   종료 시각 (포함)
+     * @return 200 OK + 삭제 건수 Map
+     */
+    @DeleteMapping("/period")
+    public ResponseEntity<Map<String, Object>> deleteInspectionsByPeriod(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        log.warn("[DELETE /api/inspections/period] {} ~ {} 기간 삭제 요청", from, to);
+        int removed = inspectionService.deleteInspectionsByPeriod(from, to);
+        return ResponseEntity.ok(Map.of("deletedCount", removed));
     }
 }

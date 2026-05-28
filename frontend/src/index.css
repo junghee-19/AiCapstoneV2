@@ -12,3 +12,37 @@
 /* 부드러운 화면 전환 */
 * { transition-property: background-color, border-color, color;
     transition-duration: 150ms; }
+
+/* ── 라이트 모드 오버라이드 ────────────────────────────────────────────────
+   body.theme-light 클래스가 붙으면 다크 톤 Tailwind 색상을 라이트로 덮어쓴다.
+   PASS/FAIL/경고(green/red/yellow) 등 의미 색상은 의도적으로 제외. */
+
+body.theme-light                         { background-color: #f3f4f6 !important;
+                                           color: #1f2937 !important; }
+
+body.theme-light .bg-gray-950            { background-color: #f3f4f6 !important; }
+body.theme-light .bg-gray-900            { background-color: #ffffff !important; }
+body.theme-light .bg-gray-900\/60        { background-color: #ffffff !important; }
+body.theme-light .bg-gray-800            { background-color: #e5e7eb !important; }
+body.theme-light .bg-gray-800\/60        { background-color: #f3f4f6 !important; }
+body.theme-light .hover\:bg-gray-800:hover { background-color: #e5e7eb !important; }
+body.theme-light .hover\:bg-gray-700:hover { background-color: #d1d5db !important; }
+
+body.theme-light .text-white             { color: #111827 !important; }
+body.theme-light .text-gray-100          { color: #1f2937 !important; }
+body.theme-light .text-gray-200          { color: #1f2937 !important; }
+body.theme-light .text-gray-300          { color: #374151 !important; }
+body.theme-light .text-gray-400          { color: #4b5563 !important; }
+body.theme-light .text-gray-500          { color: #6b7280 !important; }
+body.theme-light .text-gray-600          { color: #6b7280 !important; }
+body.theme-light .hover\:text-white:hover { color: #111827 !important; }
+
+body.theme-light .border-gray-700        { border-color: #d1d5db !important; }
+body.theme-light .border-gray-800        { border-color: #e5e7eb !important; }
+body.theme-light .divide-gray-800\/60 > :not([hidden]) ~ :not([hidden])
+                                         { border-color: #e5e7eb !important; }
+
+/* 라이트 모드용 스크롤바 */
+body.theme-light::-webkit-scrollbar-track  { background: #e5e7eb; }
+body.theme-light::-webkit-scrollbar-thumb  { background: #9ca3af; }
+body.theme-light::-webkit-scrollbar-thumb:hover { background: #6b7280; }
