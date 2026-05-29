@@ -12,6 +12,7 @@ edge/weights/*.pt
 edge/weights/*.onnx
 # 예외 — 까짐 검출 학습 모델은 git 으로 배포 (18MB, GitHub 제한 내)
 !edge/weights/best_defect.pt
+!edge/weights/test_best.pt
 # PatchCore 학습 산출물 — Colab 에서 생성 후 수동 배포
 edge/weights/*.npy
 edge/weights/patchcore_meta.json
