@@ -200,7 +200,7 @@ export default function HistoryPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => downloadCsv(filteredLogs)}
-            className="flex items-center gap-2 px-3 py-2 bg-Color-2 hover:bg-Color-1 text-Black-100% border border-Black-10% rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-Color-white hover:bg-Color-1 text-Black-100% border border-Black-10% rounded-lg text-xs font-medium transition-colors"
           >
             <Download size={14} />
             CSV 내보내기
@@ -209,7 +209,7 @@ export default function HistoryPage() {
           <button
             onClick={openPeriodModal}
             disabled={deletePeriodMutation.isPending}
-            className="flex items-center gap-2 px-3 py-2 bg-Color-2 hover:bg-red-200 border border-red-200 text-red-500 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 bg-Color-white hover:bg-red-200 border border-red-200 text-red-500 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
           >
             {deletePeriodMutation.isPending ? (
               <Loader2 size={14} className="animate-spin" />
@@ -222,7 +222,7 @@ export default function HistoryPage() {
           <button
             onClick={handleDeleteAll}
             disabled={deleteAllMutation.isPending}
-            className="flex items-center gap-2 px-3 py-2 bg-Color-2 hover:bg-red-700/80 border border-red-600/60 text-red-700/80 hover:text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 bg-Color-white hover:bg-red-700/80 border border-red-600/60 text-red-700/80 hover:text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
           >
             {deleteAllMutation.isPending ? (
               <Loader2 size={14} className="animate-spin" />

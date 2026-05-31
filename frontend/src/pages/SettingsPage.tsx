@@ -153,7 +153,7 @@ function SystemInfoSection() {
               max={365}
               value={retentionDays}
               onChange={(e) => setRetentionDays(Number(e.target.value))}
-              className="w-20 bg-Black-4% border border-Black-10% text-Black-100% text-xs rounded-md px-2 py-1 text-right focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-12 bg-Black-4% border border-Black-10% text-Black-100% text-xs rounded-md px-2 py-1 text-right focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
             <span className="text-xs text-Black-40%">일 (자동 삭제)</span>
           </div>
