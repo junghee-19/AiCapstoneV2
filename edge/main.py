@@ -99,6 +99,51 @@ def _stage1_detector() -> Optional[YoloDetector]:
     return fiducial_detector if settings.USE_SEPARATE_MODELS else detector
 
 
+def _stage2_detector() -> Optional[YoloDetector]:
+    """현재 설정에 맞는 Stage 2 결함/부품 탐지기 반환."""
+    return defect_detector if settings.USE_SEPARATE_MODELS else detector
+
+
+def _pcb_capture_gate(frame: np.ndarray, alignment: AlignmentResult) -> tuple[bool, str]:
+    """
+    자동 촬영 진입 조건.
+
+    피듀셜이 충분히 보이고, 두 피듀셜의 중점이 촬영 영역 중앙 허용 범위 안에 있으면
+    PCB가 검사 가능한 위치에 들어온 것으로 본다.
+    """
+    fiducial_count = int(alignment.fiducial1 is not None) + int(alignment.fiducial2 is not None)
+    if fiducial_count < settings.PCB_CAPTURE_MIN_FIDUCIALS:
+        return False, f"fiducials={fiducial_count}/{settings.PCB_CAPTURE_MIN_FIDUCIALS}"
+    if alignment.fiducial1 is None or alignment.fiducial2 is None:
+        return False, "need-two-fiducials-for-center"
+
+    h, w = frame.shape[:2]
+    center_x = (alignment.fiducial1.center_x + alignment.fiducial2.center_x) / 2.0
+    center_y = (alignment.fiducial1.center_y + alignment.fiducial2.center_y) / 2.0
+    center_dx = abs(center_x - (w / 2.0))
+    center_dy = abs(center_y - (h / 2.0))
+    centered = (
+        center_dx <= (w * settings.CAMERA_CENTER_TOLERANCE_RATIO)
+        and center_dy <= (h * settings.CAMERA_CENTER_TOLERANCE_RATIO)
+    )
+    if not centered:
+        return False, f"center_offset=({center_dx:.0f},{center_dy:.0f})"
+    return True, f"center=({center_x:.0f},{center_y:.0f})"
+
+
+def is_pcb_in_capture_area() -> tuple[bool, str]:
+    """자동 촬영 루프에서 현재 프레임에 PCB가 들어왔는지만 가볍게 확인한다."""
+    if camera is None:
+        return False, "camera-not-ready"
+    stage1 = _stage1_detector()
+    if stage1 is None:
+        return False, "stage1-not-ready"
+    frame = camera.capture()
+    fiducials, _ = stage1.detect_fiducials(frame)
+    alignment = compute_alignment(fiducials)
+    return _pcb_capture_gate(frame, alignment)
+
+
 async def _wait_for_centered_stable_pcb_frame() -> tuple[np.ndarray, str, list, int, AlignmentResult]:
     """
     PCB가 화면 중앙에 들어오고 일정 시간 거의 움직이지 않을 때까지 대기한 뒤 캡처한다.
@@ -212,6 +257,8 @@ async def _wait_for_centered_stable_pcb_frame() -> tuple[np.ndarray, str, list, 
 # ── 전역 싱글턴 객체 (앱 수명 주기 동안 유지) ─────────────────────────────────
 camera:           Optional[CameraCapture] = None
 detector:         Optional[YoloDetector]  = None  # 단일 모델 모드
+fiducial_detector: Optional[YoloDetector] = None  # Stage 1 전용 모델
+defect_detector: Optional[YoloDetector] = None  # Stage 2 전용 모델
 sender:           Optional[ServerSender]   = None
 gpio:             Any = None
 board_id_detector: Optional[YoloDetector] = None
@@ -323,7 +370,8 @@ async def lifespan(app: FastAPI):
     - GPIO 핀 안전 초기화
     - HTTP 세션 종료
     """
-    global camera, detector, sender, board_id_detector, board_profiles, ws_stop_event, ws_task
+    global camera, detector, fiducial_detector, defect_detector, sender
+    global board_id_detector, board_profiles, ws_stop_event, ws_task
     logger.info("=" * 60)
     logger.info("   PCB 비전 검사 스테이션 시작 [%s]", settings.ENVIRONMENT.upper())
     logger.info("=" * 60)
@@ -337,10 +385,26 @@ async def lifespan(app: FastAPI):
         logger.warning("[시작] 카메라 초기화 실패 (더미 모드로 계속): %s", e)
         camera = None
 
-    # 단일 통합 모델: best.pt 하나로 모든 클래스 탐지
-    logger.info("[시작] 단일 통합 모델 로드 모드")
-    detector = YoloDetector()
-    detector.load()
+    if settings.USE_SEPARATE_MODELS:
+        logger.info("[시작] 2-Stage 분리 모델 로드 모드")
+        fiducial_detector = YoloDetector(
+            weights_path=settings.effective_fiducial_weights_path(),
+            confidence_threshold=settings.effective_fiducial_confidence(),
+        )
+        fiducial_detector.load()
+        defect_detector = YoloDetector(
+            weights_path=settings.effective_defect_weights_path(),
+            confidence_threshold=settings.effective_defect_confidence(),
+        )
+        defect_detector.load()
+        detector = defect_detector
+    else:
+        # 단일 통합 모델: best.pt 하나로 모든 클래스 탐지
+        logger.info("[시작] 단일 통합 모델 로드 모드")
+        detector = YoloDetector()
+        detector.load()
+        fiducial_detector = None
+        defect_detector = None
 
     board_profiles = _load_board_profiles()
     if settings.MULTI_BOARD_ENABLED:
@@ -524,8 +588,11 @@ def _run_production_vision_pipeline(
             cv2.imshow("Captured Frame", cv2.resize(frame, (640, 360)))
             cv2.waitKey(1)
 
-        stage1_detector = detector
-        stage2_detector = detector
+        stage1_detector = _stage1_detector()
+        stage2_detector = _stage2_detector()
+        if stage1_detector is None or stage2_detector is None:
+            logger.error("[파이프라인] YOLO 탐지기가 로드되지 않아 검사를 중단합니다.")
+            return None
         selected_board_type: Optional[str] = None
         selected_expected_counts: dict[str, int] = {}
         if not settings.MULTI_BOARD_ENABLED and board_profiles:
@@ -594,8 +661,7 @@ def _run_production_vision_pipeline(
         # STEP 2-A: Stage 1 — 피듀셜 마크 탐지 및 정렬 검사
         if fiducials_precomputed is None or fiducial_ms_precomputed is None or alignment_precomputed is None:
             logger.info("[파이프라인] STEP 2-A — 피듀셜 마크 탐지")
-            stage1 = fiducial_detector if settings.USE_SEPARATE_MODELS else detector
-            fiducials, fiducial_ms = stage1.detect_fiducials(frame)
+            fiducials, fiducial_ms = stage1_detector.detect_fiducials(frame)
             alignment = compute_alignment(fiducials)
         else:
             logger.info("[파이프라인] STEP 2-A — 사전 감지된 피듀셜 사용")
@@ -1010,17 +1076,21 @@ def run_inspection_pipeline_when_pcb_present() -> bool:
 
     pipeline_start = time.perf_counter()
     frame = camera.capture()
-    stage1 = fiducial_detector if settings.USE_SEPARATE_MODELS else detector
+    stage1 = _stage1_detector()
+    if stage1 is None:
+        logger.warning("[자동검사] Stage 1 YOLO 모델이 로드되지 않아 PCB 감지를 건너뜁니다.")
+        return False
     fiducials, fiducial_ms = stage1.detect_fiducials(frame)
+    alignment = compute_alignment(fiducials)
 
-    if len(fiducials) < 1:
-        logger.debug("[자동검사] PCB 미감지 — 피듀셜 %d개", len(fiducials))
+    gate_ok, gate_reason = _pcb_capture_gate(frame, alignment)
+    if not gate_ok:
+        logger.debug("[자동검사] PCB 촬영 대기 — %s", gate_reason)
         return False
 
-    alignment = compute_alignment(fiducials)
     image_path = _save_frame(frame)
 
-    logger.info("[자동검사] PCB 감지 — 본검사 시작")
+    logger.info("[자동검사] PCB 촬영 영역 진입 감지 (%s) — 본검사 시작", gate_reason)
     _run_production_vision_pipeline(
         frame,
         image_path,

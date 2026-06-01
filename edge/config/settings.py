@@ -67,11 +67,23 @@ class Settings(BaseSettings):
     CAMERA_STABLE_ANGLE_DELTA_DEG: float = Field(default=1.5, ge=0.1, le=30.0)
     # 안정 상태 확인 중 프레임 샘플링 주기(초)
     CAMERA_STABLE_SAMPLE_INTERVAL_SEC: float = Field(default=0.2, ge=0.01, le=2.0)
+    # 자동 촬영/검사 루프 활성화 여부
+    AUTO_INSPECTION_ENABLED: bool = Field(default=True)
+    # 자동 루프에서 PCB가 없을 때 카메라를 다시 확인하는 주기(초)
+    AUTO_INSPECTION_IDLE_POLL_SEC: float = Field(default=0.5, ge=0.05, le=10.0)
+    # 자동 촬영 진입 조건: 이 개수 이상의 피듀셜이 보이면 PCB가 촬영 영역에 들어온 것으로 본다.
+    PCB_CAPTURE_MIN_FIDUCIALS: int = Field(default=2, ge=1, le=4)
 
     # ── YOLO 추론 설정 ───────────────────────────────────────────────────────
     # 단일 통합 모델 (best.pt) 사용
     YOLO_WEIGHTS_PATH: str = Field(default="weights/best.pt")
     USE_SEPARATE_MODELS: bool = Field(default=False)
+    # USE_SEPARATE_MODELS=true 일 때 Stage 1/2 전용 모델 경로.
+    # YOLO_FIDUCIAL_WEIGHTS는 기존 문서/.env 호환용 이름이다.
+    YOLO_FIDUCIAL_WEIGHTS: Optional[str] = Field(default=None)
+    YOLO_FIDUCIAL_WEIGHTS_PATH: str = Field(default="weights/fiducial_best.pt")
+    YOLO_DEFECT_WEIGHTS: Optional[str] = Field(default=None)
+    YOLO_DEFECT_WEIGHTS_PATH: Optional[str] = Field(default=None)
 
     # 이 값 이상의 confidence (Stage 전용 값이 없을 때 피듀셜·결함 공통 기본)
     YOLO_CONFIDENCE_THRESHOLD: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -105,7 +117,6 @@ class Settings(BaseSettings):
     # 정합 출력 캔버스 크기
     ALIGN_OUTPUT_WIDTH: int = Field(default=1920, ge=320, le=4096)
     ALIGN_OUTPUT_HEIGHT: int = Field(default=1080, ge=240, le=4096)
-
     # True(기본): YOLO가 1건이라도 잡으면 FAIL (단선/까짐 전용 모델).
     # False: 정렬 성공 시 PASS — 탐지 박스는 그대로 서버·대시보드에 보냄(부품 검출·표시용).
     FAIL_ON_ANY_YOLO_DETECTION: bool = Field(default=True)
@@ -190,6 +201,18 @@ class Settings(BaseSettings):
         if self.YOLO_DEFECT_CONFIDENCE_THRESHOLD is not None:
             return float(self.YOLO_DEFECT_CONFIDENCE_THRESHOLD)
         return float(self.YOLO_CONFIDENCE_THRESHOLD)
+
+    def effective_fiducial_weights_path(self) -> str:
+        if self.YOLO_FIDUCIAL_WEIGHTS:
+            return self.YOLO_FIDUCIAL_WEIGHTS
+        return self.YOLO_FIDUCIAL_WEIGHTS_PATH
+
+    def effective_defect_weights_path(self) -> str:
+        if self.YOLO_DEFECT_WEIGHTS:
+            return self.YOLO_DEFECT_WEIGHTS
+        if self.YOLO_DEFECT_WEIGHTS_PATH:
+            return self.YOLO_DEFECT_WEIGHTS_PATH
+        return self.YOLO_WEIGHTS_PATH
 
     def defect_class_set(self) -> set[str]:
         return {

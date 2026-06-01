@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 _auto_running: bool = False
 _auto_interval: float = 5.0
 _auto_task: Optional[asyncio.Task[None]] = None
+_auto_waiting_for_exit: bool = False
 _trigger_lock = asyncio.Lock()
-AUTO_INSPECTION_ENABLED: bool = False
+AUTO_INSPECTION_ENABLED: bool = settings.AUTO_INSPECTION_ENABLED
 
 
 def _packet_to_touchscreen_payload(packet: InspectionPacket) -> dict[str, Any]:
@@ -86,6 +87,7 @@ def auto_status() -> dict[str, Any]:
         "enabled": AUTO_INSPECTION_ENABLED,
         "running": _auto_running,
         "interval_seconds": _auto_interval,
+        "waiting_for_pcb_exit": _auto_waiting_for_exit,
     }
 
 
@@ -166,7 +168,7 @@ async def trigger_file_inspection(
 
 async def start_auto_inspection(interval: float = 5.0) -> dict[str, Any]:
     """Start the background auto-inspection loop if it is not already running."""
-    global _auto_running, _auto_interval, _auto_task
+    global _auto_running, _auto_interval, _auto_task, _auto_waiting_for_exit
 
     if not AUTO_INSPECTION_ENABLED:
         task = _auto_task
@@ -184,6 +186,7 @@ async def start_auto_inspection(interval: float = 5.0) -> dict[str, Any]:
         return auto_status()
 
     _auto_running = True
+    _auto_waiting_for_exit = False
     _auto_interval = float(interval)
     _auto_task = asyncio.create_task(_auto_inspect_loop(), name="edge-auto-inspection")
     logger.info("[검사제어] 자동 연속 검사 시작 — 간격: %.1f초", _auto_interval)
@@ -192,9 +195,10 @@ async def start_auto_inspection(interval: float = 5.0) -> dict[str, Any]:
 
 async def stop_auto_inspection() -> dict[str, Any]:
     """Stop the background auto-inspection loop."""
-    global _auto_running, _auto_task
+    global _auto_running, _auto_task, _auto_waiting_for_exit
 
     _auto_running = False
+    _auto_waiting_for_exit = False
     task = _auto_task
     _auto_task = None
     if task is not None and not task.done():
@@ -209,17 +213,27 @@ async def stop_auto_inspection() -> dict[str, Any]:
 
 async def _auto_inspect_loop() -> None:
     """Watch for PCB presence and run inspections repeatedly."""
-    global _auto_running
+    global _auto_running, _auto_waiting_for_exit
 
-    idle_poll_seconds = 0.5
+    idle_poll_seconds = settings.AUTO_INSPECTION_IDLE_POLL_SEC
     while _auto_running:
         try:
-            from main import run_inspection_pipeline_when_pcb_present
+            from main import is_pcb_in_capture_area, run_inspection_pipeline_when_pcb_present
+
+            if _auto_waiting_for_exit:
+                present, reason = await asyncio.to_thread(is_pcb_in_capture_area)
+                if present:
+                    logger.debug("[자동검사] 이전 PCB 배출 대기 중 — %s", reason)
+                    await asyncio.sleep(idle_poll_seconds)
+                    continue
+                _auto_waiting_for_exit = False
+                logger.info("[자동검사] PCB 배출 확인 — 다음 PCB 감시 재개")
 
             logger.info("[자동검사] PCB 감시 중...")
             async with _trigger_lock:
                 performed = await asyncio.to_thread(run_inspection_pipeline_when_pcb_present)
             if performed:
+                _auto_waiting_for_exit = True
                 logger.info("[자동검사] 검사 완료 — 다음 감시까지 %.1f초 대기", _auto_interval)
                 await asyncio.sleep(_auto_interval)
                 continue

@@ -147,10 +147,17 @@ async def get_status() -> dict[str, Any]:
     from inference.yolo_detector import resolve_edge_weights_path
 
     wu = resolve_edge_weights_path(settings.YOLO_WEIGHTS_PATH)
+    fiducial_wu = resolve_edge_weights_path(settings.effective_fiducial_weights_path())
+    defect_wu = resolve_edge_weights_path(settings.effective_defect_weights_path())
     weights_loaded = wu.exists()
     yolo_block = {
+        "use_separate_models": settings.USE_SEPARATE_MODELS,
         "weights_path": str(wu),
         "weights_loaded": weights_loaded,
+        "fiducial_weights_path": str(fiducial_wu),
+        "fiducial_weights_loaded": fiducial_wu.exists(),
+        "defect_weights_path": str(defect_wu),
+        "defect_weights_loaded": defect_wu.exists(),
         "confidence_threshold": settings.YOLO_CONFIDENCE_THRESHOLD,
         "fiducial_confidence": settings.effective_fiducial_confidence(),
         "defect_confidence": settings.effective_defect_confidence(),
@@ -167,6 +174,10 @@ async def get_status() -> dict[str, Any]:
         },
         "pipeline": {
             "stage2_source_mode": settings.STAGE2_SOURCE_MODE,
+            "auto_inspection_enabled": settings.AUTO_INSPECTION_ENABLED,
+            "auto_inspection_idle_poll_sec": settings.AUTO_INSPECTION_IDLE_POLL_SEC,
+            "pcb_capture_min_fiducials": settings.PCB_CAPTURE_MIN_FIDUCIALS,
+            "camera_center_tolerance_ratio": settings.CAMERA_CENTER_TOLERANCE_RATIO,
         },
     }
 
