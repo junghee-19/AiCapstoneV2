@@ -16,6 +16,7 @@ _auto_interval: float = 5.0
 _auto_task: Optional[asyncio.Task[None]] = None
 _auto_waiting_for_exit: bool = False
 _auto_cooldown_until: float = 0.0
+_auto_capture_candidate_since: Optional[float] = None
 _trigger_lock = asyncio.Lock()
 AUTO_INSPECTION_ENABLED: bool = settings.AUTO_INSPECTION_ENABLED
 
@@ -86,12 +87,19 @@ async def _notify_result(packet: InspectionPacket) -> None:
 
 def auto_status() -> dict[str, Any]:
     cooldown_remaining = max(0.0, _auto_cooldown_until - time.monotonic())
+    hold_remaining = 0.0
+    if _auto_capture_candidate_since is not None:
+        held_for = time.monotonic() - _auto_capture_candidate_since
+        hold_remaining = max(0.0, settings.AUTO_CAPTURE_HOLD_SEC - held_for)
     return {
         "enabled": AUTO_INSPECTION_ENABLED,
         "running": _auto_running,
         "interval_seconds": _auto_interval,
         "waiting_for_pcb_exit": _auto_waiting_for_exit,
         "cooldown_remaining_seconds": round(cooldown_remaining, 1),
+        "capture_hold_seconds": settings.AUTO_CAPTURE_HOLD_SEC,
+        "capture_hold_remaining_seconds": round(hold_remaining, 1),
+        "capture_candidate_active": _auto_capture_candidate_since is not None,
         "result_display_seconds": settings.AUTO_RESULT_DISPLAY_SEC,
     }
 
@@ -173,7 +181,8 @@ async def trigger_file_inspection(
 
 async def start_auto_inspection(interval: float = 5.0) -> dict[str, Any]:
     """Start the background auto-inspection loop if it is not already running."""
-    global _auto_running, _auto_interval, _auto_task, _auto_waiting_for_exit, _auto_cooldown_until
+    global _auto_running, _auto_interval, _auto_task
+    global _auto_waiting_for_exit, _auto_cooldown_until, _auto_capture_candidate_since
 
     if not AUTO_INSPECTION_ENABLED:
         task = _auto_task
@@ -193,6 +202,7 @@ async def start_auto_inspection(interval: float = 5.0) -> dict[str, Any]:
     _auto_running = True
     _auto_waiting_for_exit = False
     _auto_cooldown_until = 0.0
+    _auto_capture_candidate_since = None
     _auto_interval = float(interval)
     _auto_task = asyncio.create_task(_auto_inspect_loop(), name="edge-auto-inspection")
     logger.info("[검사제어] 자동 연속 검사 시작 — 간격: %.1f초", _auto_interval)
@@ -201,11 +211,13 @@ async def start_auto_inspection(interval: float = 5.0) -> dict[str, Any]:
 
 async def stop_auto_inspection() -> dict[str, Any]:
     """Stop the background auto-inspection loop."""
-    global _auto_running, _auto_task, _auto_waiting_for_exit, _auto_cooldown_until
+    global _auto_running, _auto_task
+    global _auto_waiting_for_exit, _auto_cooldown_until, _auto_capture_candidate_since
 
     _auto_running = False
     _auto_waiting_for_exit = False
     _auto_cooldown_until = 0.0
+    _auto_capture_candidate_since = None
     task = _auto_task
     _auto_task = None
     if task is not None and not task.done():
@@ -220,7 +232,7 @@ async def stop_auto_inspection() -> dict[str, Any]:
 
 async def _auto_inspect_loop() -> None:
     """Watch for PCB presence and run inspections repeatedly."""
-    global _auto_running, _auto_waiting_for_exit, _auto_cooldown_until
+    global _auto_running, _auto_waiting_for_exit, _auto_cooldown_until, _auto_capture_candidate_since
 
     idle_poll_seconds = settings.AUTO_INSPECTION_IDLE_POLL_SEC
     while _auto_running:
@@ -229,10 +241,12 @@ async def _auto_inspect_loop() -> None:
 
             cooldown_remaining = _auto_cooldown_until - time.monotonic()
             if cooldown_remaining > 0:
+                _auto_capture_candidate_since = None
                 await asyncio.sleep(min(idle_poll_seconds, cooldown_remaining))
                 continue
 
             if _auto_waiting_for_exit:
+                _auto_capture_candidate_since = None
                 present, reason = await asyncio.to_thread(is_pcb_in_capture_area)
                 if present:
                     logger.debug("[자동검사] 이전 PCB 배출 대기 중 — %s", reason)
@@ -244,8 +258,23 @@ async def _auto_inspect_loop() -> None:
             logger.info("[자동검사] PCB 감시 중...")
             present, reason = await asyncio.to_thread(is_pcb_in_capture_area)
             if not present:
+                if _auto_capture_candidate_since is not None:
+                    logger.info("[자동검사] 촬영 대기 조건 해제 — %s", reason)
+                _auto_capture_candidate_since = None
                 logger.debug("[자동검사] PCB 촬영 대기 — %s", reason)
                 await asyncio.sleep(idle_poll_seconds)
+                continue
+
+            now = time.monotonic()
+            if _auto_capture_candidate_since is None:
+                _auto_capture_candidate_since = now
+                logger.info("[자동검사] PCB 위치 확인 — %.1f초 유지 후 촬영", settings.AUTO_CAPTURE_HOLD_SEC)
+
+            held_for = now - _auto_capture_candidate_since
+            hold_remaining = settings.AUTO_CAPTURE_HOLD_SEC - held_for
+            if hold_remaining > 0:
+                logger.debug("[자동검사] 촬영 전 대기 중 — 남은 %.1f초 (%s)", hold_remaining, reason)
+                await asyncio.sleep(min(idle_poll_seconds, hold_remaining))
                 continue
 
             state = get_touchscreen_state()
@@ -253,6 +282,7 @@ async def _auto_inspect_loop() -> None:
             async with _trigger_lock:
                 packet = await asyncio.to_thread(run_inspection_pipeline_when_pcb_present)
             if packet is not None:
+                _auto_capture_candidate_since = None
                 await _notify_result(packet)
                 _auto_waiting_for_exit = True
                 _auto_cooldown_until = (
@@ -263,6 +293,7 @@ async def _auto_inspect_loop() -> None:
                 logger.info("[자동검사] 검사 완료 — 다음 감시까지 %.1f초 대기", _auto_interval)
                 await asyncio.sleep(_auto_interval)
                 continue
+            _auto_capture_candidate_since = None
             await state.set_idle()
         except asyncio.CancelledError:
             raise

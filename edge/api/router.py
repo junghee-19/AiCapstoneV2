@@ -274,6 +274,7 @@ async def get_status() -> dict[str, Any]:
             "auto_inspection_idle_poll_sec": settings.AUTO_INSPECTION_IDLE_POLL_SEC,
             "auto_result_display_sec": settings.AUTO_RESULT_DISPLAY_SEC,
             "auto_capture_cooldown_sec": settings.AUTO_CAPTURE_COOLDOWN_SEC,
+            "auto_capture_hold_sec": settings.AUTO_CAPTURE_HOLD_SEC,
             "pcb_capture_min_fiducials": settings.PCB_CAPTURE_MIN_FIDUCIALS,
             "pcb_capture_center": {
                 "x_ratio": settings.PCB_CAPTURE_CENTER_X_RATIO,

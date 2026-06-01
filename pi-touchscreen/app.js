@@ -22,6 +22,7 @@
   let actionInFlight = false
   let resultDisplaySeconds = 4
   let cooldownRemainingSeconds = 0
+  let captureHoldRemainingSeconds = 0
   let resultCountdownTimer = null
   let resultDismissTimer = null
 
@@ -182,6 +183,7 @@
       autoRunning = Boolean(autoResult.value.running)
       resultDisplaySeconds = Number(autoResult.value.result_display_seconds || resultDisplaySeconds)
       cooldownRemainingSeconds = Number(autoResult.value.cooldown_remaining_seconds || 0)
+      captureHoldRemainingSeconds = Number(autoResult.value.capture_hold_remaining_seconds || 0)
       body.dataset.auto = autoRunning ? 'running' : 'stopped'
       autoState.textContent = autoRunning
         ? statusTextForAuto(autoResult.value)
@@ -191,6 +193,7 @@
     } else {
       autoRunning = false
       cooldownRemainingSeconds = 0
+      captureHoldRemainingSeconds = 0
       body.dataset.auto = 'stopped'
       autoState.textContent = '상태 확인 실패'
       updateLiveBadge(null)
@@ -202,16 +205,21 @@
     if (Number(auto.cooldown_remaining_seconds || 0) > 0) {
       return `쿨타임 ${Math.ceil(auto.cooldown_remaining_seconds)}초`
     }
+    if (Number(auto.capture_hold_remaining_seconds || 0) > 0) {
+      return `촬영 대기 ${Math.ceil(auto.capture_hold_remaining_seconds)}초`
+    }
     if (auto.waiting_for_pcb_exit) return 'PCB 배출 대기'
     return '실행 중'
   }
 
   function updateLiveBadge(auto) {
     if (!liveBadgeText) return
-    const remaining = Number((auto && auto.cooldown_remaining_seconds) || cooldownRemainingSeconds)
-    const cooling = autoRunning && remaining > 0
-    body.dataset.live = cooling ? 'cooldown' : 'live'
-    liveBadgeText.textContent = cooling ? `대기중... ${Math.ceil(remaining)}초` : 'LIVE'
+    const cooldown = Number((auto && auto.cooldown_remaining_seconds) || cooldownRemainingSeconds)
+    const hold = Number((auto && auto.capture_hold_remaining_seconds) || captureHoldRemainingSeconds)
+    const waitingSeconds = Math.max(cooldown, hold)
+    const waiting = autoRunning && waitingSeconds > 0
+    body.dataset.live = waiting ? 'cooldown' : 'live'
+    liveBadgeText.textContent = waiting ? `대기중... ${Math.ceil(waitingSeconds)}초` : 'LIVE'
   }
 
   function handleStateUpdate(state) {

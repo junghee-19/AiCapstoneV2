@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     AUTO_RESULT_DISPLAY_SEC: float = Field(default=4.0, ge=1.0, le=30.0)
     # 결과 화면 복귀 후 다음 자동 촬영까지 최소 대기 시간(초)
     AUTO_CAPTURE_COOLDOWN_SEC: float = Field(default=5.0, ge=0.0, le=60.0)
+    # PCB가 촬영 가능 위치에 들어온 뒤 이 시간만큼 유지되면 실제 촬영/검사를 시작한다.
+    AUTO_CAPTURE_HOLD_SEC: float = Field(default=5.0, ge=0.0, le=30.0)
     # 자동 촬영 진입 조건: 이 개수 이상의 피듀셜이 보이면 PCB가 촬영 영역에 들어온 것으로 본다.
     PCB_CAPTURE_MIN_FIDUCIALS: int = Field(default=2, ge=1, le=4)
     # 자동 촬영 기준 위치. fiducial 2개의 중점이 이 normalized 좌표 주변에 들어오면 촬영 가능.
