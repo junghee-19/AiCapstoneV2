@@ -14,8 +14,9 @@ import {
 import { useTrendData } from '@/hooks/useInspectionData'
 
 /* 색상 상수 */
-const PASS_COLOR = '#5eead4'
-const FAIL_COLOR = '#60a5fa'
+/* 파스텔 톤 — 라이트 테마 가독성 */
+const PASS_COLOR = '#86EFAC'  // pastel green
+const FAIL_COLOR = '#FCA5A5'  // pastel red
 
 // ── 커스텀 툴팁 ───────────────────────────────────────────────────────────────
 
@@ -31,20 +32,20 @@ function CustomTooltip({
   const total = payload.reduce((sum, p) => sum + (p.value ?? 0), 0)
 
   return (
-    <div className="rounded-lg border border-white/10 bg-[#10141b] px-3 py-2 text-xs shadow-xl">
-      <p className="mb-1.5 text-slate-400">{label}</p>
+    <div className="rounded-lg border border-Black-10% bg-white px-3 py-2 text-xs shadow-xl">
+      <p className="mb-1.5 text-Black-40%">{label}</p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2">
           <span
             className="w-2 h-2 rounded-full inline-block"
             style={{ backgroundColor: p.fill }}
           />
-          <span className="text-slate-300">{p.name}:</span>
-          <span className="text-white font-bold">{p.value}건</span>
+          <span className="text-Black-80%">{p.name}:</span>
+          <span className="text-Black-100% font-bold">{p.value}건</span>
         </div>
       ))}
-      <div className="mt-1.5 border-t border-white/10 pt-1.5 text-slate-400">
-        합계: <span className="text-white">{total}건</span>
+      <div className="mt-1.5 border-t border-Black-10% pt-1.5 text-Black-40%">
+        합계: <span className="text-Black-100%">{total}건</span>
       </div>
     </div>
   )
@@ -58,9 +59,9 @@ export default function TrendChart() {
   /* 로딩 스켈레톤 */
   if (isLoading) {
     return (
-      <div className="h-80 rounded-[20px] border border-white/5 bg-[#171b22] p-6 animate-pulse">
+      <div className="h-80 rounded-[20px] border border-Black-10% bg-white p-6 animate-pulse">
         <div className="mb-4 h-5 w-36 rounded bg-white/10" />
-        <div className="h-[248px] rounded-2xl bg-black/20" />
+        <div className="h-[248px] rounded-2xl bg-Black-10%" />
       </div>
     )
   }
@@ -68,24 +69,24 @@ export default function TrendChart() {
   /* 데이터 없음 안내 */
   if (!trendData.length) {
     return (
-      <div className="flex h-80 items-center justify-center rounded-[20px] border border-white/5 bg-[#171b22] p-6">
-        <p className="text-sm text-slate-500">최근 24시간 검사 데이터가 없습니다.</p>
+      <div className="flex h-80 items-center justify-center rounded-[20px] border border-Black-10% bg-white p-6">
+        <p className="text-sm text-Black-40%">최근 24시간 검사 데이터가 없습니다.</p>
       </div>
     )
   }
 
   return (
-    <div className="h-80 min-w-0 overflow-hidden rounded-[20px] border border-white/5 bg-[#171b22] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
+    <div className="h-80 min-w-0 overflow-hidden rounded-[20px] border border-Black-10% bg-white p-6 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap items-center gap-4 rounded-lg bg-black/10 px-1 py-1">
+        <div className="flex flex-wrap items-center gap-4 rounded-lg bg-Black-4% px-1 py-1">
           <button
             type="button"
-            className="rounded-xl bg-white px-3 py-1.5 text-sm font-semibold text-slate-950 shadow-sm"
+            className="rounded-xl bg-white px-3 py-1.5 text-sm font-semibold text-Black-100% shadow-sm"
           >
             Inspection Trend
           </button>
-          <span className="px-1 text-sm text-slate-500">PASS</span>
-          <span className="px-1 text-sm text-slate-500">FAIL</span>
+          <span className="px-1 text-sm text-Black-40%">PASS</span>
+          <span className="px-1 text-sm text-Black-40%">FAIL</span>
         </div>
       </div>
 
@@ -98,18 +99,18 @@ export default function TrendChart() {
         >
           <CartesianGrid
             strokeDasharray="0"
-            stroke="rgba(148, 163, 184, 0.16)"
+            stroke="rgba(28, 28, 28, 0.1)"
             vertical={false}
           />
           <XAxis
             dataKey="label"
-            tick={{ fill: '#7c8799', fontSize: 11 }}
+            tick={{ fill: '#1C1C1C', fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             dy={8}
           />
           <YAxis
-            tick={{ fill: '#7c8799', fontSize: 11 }}
+            tick={{ fill: '#1C1C1C', fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             allowDecimals={false}
@@ -117,14 +118,14 @@ export default function TrendChart() {
           />
           <Tooltip
             content={<CustomTooltip />}
-            cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+            cursor={{ fill: 'rgba(28,28,28,0.04)' }}
           />
           <Legend
             verticalAlign="top"
             align="right"
             height={0}
             formatter={(value) => (
-              <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{value}</span>
+              <span style={{ color: '#1C1C1C', fontSize: '0.75rem' }}>{value}</span>
             )}
           />
           <Bar dataKey="pass" name="PASS" stackId="stack" fill={PASS_COLOR} radius={[8, 8, 0, 0]} />

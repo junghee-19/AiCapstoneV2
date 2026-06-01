@@ -184,3 +184,22 @@ export const inspectImage = async (file: File): Promise<InspectionLog> => {
   const { data } = await apiClient.post<InspectionLog>('/inspections', formData)
   return data
 }
+
+// ── 시스템 설정 ──────────────────────────────────────────────────────────────
+
+export interface AppSettings {
+  /** 검사 이력 보관 기간 (1~365 일) */
+  retentionDays: number
+  /** 자동 정리 cron 표현식 (Spring 6필드: 초 분 시 일 월 요일) */
+  cleanupCron: string
+}
+
+export const fetchAppSettings = async (): Promise<AppSettings> => {
+  const { data } = await apiClient.get<AppSettings>('/settings')
+  return data
+}
+
+export const updateAppSettings = async (settings: AppSettings): Promise<AppSettings> => {
+  const { data } = await apiClient.put<AppSettings>('/settings', settings)
+  return data
+}

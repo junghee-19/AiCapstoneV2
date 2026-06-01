@@ -236,7 +236,7 @@ function imageDownloadName(log: InspectionLog): string {
 
 function PanelBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="absolute top-2 left-2 z-10 text-[10px] font-semibold uppercase tracking-wide bg-black/65 text-gray-100 px-2 py-0.5 rounded border border-gray-700/80">
+    <span className="absolute top-2 left-2 z-10 text-[10px] font-semibold uppercase tracking-wide bg-white/90 text-Black-100% px-2 py-0.5 rounded border border-Black-10%">
       {children}
     </span>
   )
@@ -286,16 +286,16 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
   const scaleY = imgSize.h / Math.max(1, refPixels.h)
 
   return (
-    <div className="mt-4 bg-gray-900 rounded-xl border border-gray-700 overflow-hidden">
+    <div className="bg-white rounded-xl overflow-hidden">
 
       {/* 헤더 바 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-Black-10%">
         <div className="flex items-center gap-2">
           <AlertCircle size={15} className="text-indigo-400" />
-          <span className="text-sm font-semibold text-gray-200">
+          <span className="text-sm font-semibold text-Black-100%">
             검사 상세 (피듀셜)
             {log && (
-              <span className="ml-2 text-xs text-gray-500 font-normal">
+              <span className="ml-2 text-xs text-Black-40% font-normal">
                 #{log.id} — {log.result === 'PASS' ? '✅ PASS' : '❌ FAIL'}
               </span>
             )}
@@ -303,7 +303,7 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-white transition-colors"
+          className="p-1 rounded hover:bg-Black-4% text-Black-40% hover:text-Black-100% transition-colors"
           aria-label="닫기"
         >
           <X size={16} />
@@ -326,9 +326,9 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
       {/* 본문 */}
       {isLoading ? (
         /* 로딩 스켈레톤 */
-        <div className="h-64 animate-pulse bg-gray-800/50" />
+        <div className="h-64 animate-pulse bg-Black-4%/50" />
       ) : !log ? (
-        <div className="h-32 flex items-center justify-center text-gray-500 text-sm">
+        <div className="h-32 flex items-center justify-center text-Black-40% text-sm">
           데이터를 불러올 수 없습니다.
         </div>
       ) : (
@@ -338,13 +338,13 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
           <div
             className={
               showSideBySide
-                ? 'flex flex-col sm:flex-row flex-1 min-w-0 border-b lg:border-b-0 lg:border-r border-gray-800'
-                : 'relative flex-1 bg-gray-950 min-h-48 border-b lg:border-b-0 lg:border-r border-gray-800'
+                ? 'flex flex-col sm:flex-row flex-1 min-w-0 border-b lg:border-b-0 lg:border-r border-Black-10%'
+                : 'relative flex-1 bg-Background-1 min-h-48 border-b lg:border-b-0 lg:border-r border-Black-10%'
             }
           >
             {showSideBySide ? (
               <>
-                <div className="relative flex-1 min-w-0 bg-gray-950 border-b sm:border-b-0 sm:border-r border-gray-800/90">
+                <div className="relative flex-1 min-w-0 bg-Background-1 border-b sm:border-b-0 sm:border-r border-Black-10%/90">
                   <PanelBadge>보정 전</PanelBadge>
                   {rawSrc && !rawLoadError ? (
                     <img
@@ -354,13 +354,13 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                       onError={() => setRawLoadError(true)}
                     />
                   ) : (
-                    <div className="w-full min-h-32 flex flex-col items-center justify-center gap-2 px-4 py-8 bg-gray-900/50">
-                      <ImageOff size={28} className="text-gray-600" />
-                      <p className="text-xs text-gray-500">원본 이미지를 불러오지 못했습니다.</p>
+                    <div className="w-full min-h-32 flex flex-col items-center justify-center gap-2 px-4 py-8 bg-white border border-Black-10%/50">
+                      <ImageOff size={28} className="text-Black-40%" />
+                      <p className="text-xs text-Black-40%">원본 이미지를 불러오지 못했습니다.</p>
                     </div>
                   )}
                 </div>
-                <div className="relative flex-1 min-w-0 bg-gray-950">
+                <div className="relative flex-1 min-w-0 bg-Background-1">
                   <PanelBadge>보정 후 · 피듀셜 + 결함</PanelBadge>
                   {deskewSrc && !deskewLoadError ? (
                     <>
@@ -420,9 +420,9 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                       </svg>
                     </>
                   ) : (
-                    <div className="w-full aspect-video bg-gray-800/60 flex flex-col items-center justify-center gap-2 px-4 text-center">
-                      <ImageOff size={32} className="text-gray-600" />
-                      <p className="text-xs text-gray-400">보정 이미지를 불러오지 못했습니다.</p>
+                    <div className="w-full aspect-video bg-Black-4%/60 flex flex-col items-center justify-center gap-2 px-4 text-center">
+                      <ImageOff size={32} className="text-Black-40%" />
+                      <p className="text-xs text-Black-40%">보정 이미지를 불러오지 못했습니다.</p>
                     </div>
                   )}
                 </div>
@@ -485,10 +485,10 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                 </svg>
               </div>
             ) : deskewSrc && deskewLoadError ? (
-              <div className="w-full aspect-video bg-gray-800/60 flex flex-col items-center justify-center gap-2 px-4 text-center">
-                <ImageOff size={32} className="text-gray-600" />
-                <p className="text-xs text-gray-400">캡처 이미지를 불러오지 못했습니다.</p>
-                <p className="text-xs text-gray-500">
+              <div className="w-full aspect-video bg-Black-4%/60 flex flex-col items-center justify-center gap-2 px-4 text-center">
+                <ImageOff size={32} className="text-Black-40%" />
+                <p className="text-xs text-Black-40%">캡처 이미지를 불러오지 못했습니다.</p>
+                <p className="text-xs text-Black-40%">
                   <code className="text-indigo-300">frontend/vite.config.ts</code>의{' '}
                   <code className="text-indigo-300">/captures</code> 프록시가 Pi IP와 맞는지,
                   Pi에서 <code className="text-indigo-300">uvicorn</code>이 떠 있는지 확인하세요.
@@ -497,18 +497,18 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
             ) : (
               <div
                 ref={imgRef as React.RefObject<HTMLDivElement> as React.RefObject<any>}
-                className="w-full aspect-video bg-gray-800/60 flex flex-col items-center justify-center gap-2"
+                className="w-full aspect-video bg-Black-4%/60 flex flex-col items-center justify-center gap-2"
               >
-                <ImageOff size={32} className="text-gray-600" />
-                <p className="text-xs text-gray-500">캡처 이미지 없음</p>
-                <p className="text-xs text-gray-600">(더미 모드에서는 이미지가 저장되지 않습니다)</p>
+                <ImageOff size={32} className="text-Black-40%" />
+                <p className="text-xs text-Black-40%">캡처 이미지 없음</p>
+                <p className="text-xs text-Black-40%">(더미 모드에서는 이미지가 저장되지 않습니다)</p>
               </div>
             )}
           </div>
 
           {/* 우측: 검사 메타데이터 패널 */}
-          <div className="w-full lg:w-64 border-t lg:border-t-0 lg:border-l border-gray-800 p-4 shrink-0">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <div className="w-full lg:w-64 border-t lg:border-t-0 lg:border-l border-Black-10% p-4 shrink-0">
+            <h3 className="text-xs font-semibold text-Black-40% uppercase tracking-wider mb-3">
               검사 정보
             </h3>
 
@@ -586,8 +586,8 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
             )}
 
             {overlayDefects.length > 0 && (
-              <div className="mt-4 border-t border-gray-800 pt-3">
-                <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              <div className="mt-4 border-t border-Black-10% pt-3">
+                <h4 className="text-[11px] font-semibold text-Black-40% uppercase tracking-wider mb-2">
                   검출 좌표
                 </h4>
                 <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
@@ -607,24 +607,24 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
                     return (
                       <div
                         key={`${d.defectType}-${d.bboxX}-${d.bboxY}-${i}`}
-                        className="rounded-md border border-gray-700/80 bg-gray-950/80 px-2.5 py-2"
+                        className="rounded-md border border-Black-10% bg-Background-1/80 px-2.5 py-2"
                       >
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <span className="text-[11px] font-semibold truncate" style={{ color }}>
                             {i + 1}. {defectDisplayName(d.defectType)}
                           </span>
-                          <span className="text-[11px] font-mono text-gray-400">
+                          <span className="text-[11px] font-mono text-Black-40%">
                             {(d.confidence * 100).toFixed(1)}%
                           </span>
                         </div>
-                        <div className="text-[11px] font-mono text-gray-300 leading-relaxed">
+                        <div className="text-[11px] font-mono text-Black-80% leading-relaxed">
                           <div>좌상단: ({d.bboxX}, {d.bboxY})</div>
                           <div>크기: {d.bboxWidth}×{d.bboxHeight}px</div>
-                          <div className="text-sky-300">중심: ({cx}, {cy})</div>
+                          <div className="text-Black-100%">중심: ({cx}, {cy})</div>
                           {(distF1 != null || distF2 != null) && (
-                            <div className="text-cyan-300 mt-1">
+                            <div className="text-Black-100% mt-1">
                               {distF1 != null && <span>F1까지: {distF1.toFixed(1)}px</span>}
-                              {distF1 != null && distF2 != null && <span className="mx-1.5 text-gray-600">|</span>}
+                              {distF1 != null && distF2 != null && <span className="mx-1.5 text-Black-40%">|</span>}
                               {distF2 != null && <span>F2까지: {distF2.toFixed(1)}px</span>}
                             </div>
                           )}
@@ -647,18 +647,18 @@ export default function DefectViewer({ inspectionId, onClose }: DefectViewerProp
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
-      <dt className="text-gray-500 shrink-0">{label}</dt>
-      <dd className="text-gray-300 font-mono text-right truncate">{value}</dd>
+      <dt className="text-Black-40% shrink-0">{label}</dt>
+      <dd className="text-Black-80% font-mono text-right truncate">{value}</dd>
     </div>
   )
 }
 
-/** 피듀셜 중심 좌표 — 패널에서 가장 눈에 띄게 */
+/** 피듀셜 중심 좌표 — 패널에서 가장 눈에 띄게 (라이트 톤, 반전) */
 function MetaCoordRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border-2 border-sky-600/50 bg-slate-950 px-3 py-2.5 shadow-lg shadow-sky-950/40">
-      <dt className="text-[11px] font-semibold text-sky-200/90 tracking-wide">{label}</dt>
-      <dd className="text-base sm:text-lg font-bold font-mono text-sky-300 tabular-nums tracking-tight break-all">
+    <div className="flex flex-col gap-1.5 rounded-lg border border-Black-10% bg-white px-3 py-2.5 shadow-sm">
+      <dt className="text-[11px] font-semibold text-sky-600 tracking-wide">{label}</dt>
+      <dd className="text-base sm:text-lg font-bold font-mono text-Black-100% tabular-nums tracking-tight break-all">
         {value}
       </dd>
     </div>

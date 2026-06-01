@@ -12,9 +12,9 @@ import {
 import { useStats } from '@/hooks/useInspectionData'
 import type { PieDataPoint } from '@/types/inspection'
 
-/* 합격/불합격 색상 */
-const PASS_COLOR = '#22c55e'  // green-500
-const FAIL_COLOR = '#ef4444'  // red-500
+/* 합격/불합격 색상 — 파스텔 톤 (라이트 테마 가독성) */
+const PASS_COLOR = '#86EFAC'  // green-300 파스텔 그린
+const FAIL_COLOR = '#FCA5A5'  // red-300 파스텔 핑크
 
 // ── 커스텀 중앙 레이블 ────────────────────────────────────────────────────────
 
@@ -34,8 +34,7 @@ function CenterLabel({
         x={cx} y={cy - 8}
         textAnchor="middle"
         dominantBaseline="central"
-        className="fill-white font-bold text-2xl"
-        style={{ fontSize: '1.5rem', fontWeight: 700, fill: '#fff' }}
+        style={{ fontSize: '1.5rem', fontWeight: 700, fill: '#1C1C1C' }}
       >
         {failRate.toFixed(1)}%
       </text>
@@ -43,7 +42,7 @@ function CenterLabel({
       <text
         x={cx} y={cy + 18}
         textAnchor="middle"
-        style={{ fontSize: '0.75rem', fill: '#9ca3af' }}
+        style={{ fontSize: '0.75rem', fill: 'rgba(28, 28, 28, 0.4)' }}
       >
         불량률
       </text>
@@ -57,9 +56,9 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { name
   if (!active || !payload?.length) return null
   const { name, value } = payload[0]
   return (
-    <div className="rounded-lg border border-white/10 bg-[#10141b] px-3 py-2 text-xs shadow-xl">
-      <span className="text-slate-300">{name}: </span>
-      <span className="text-white font-bold">{value.toLocaleString()}건</span>
+    <div className="rounded-lg border border-Black-10% bg-white px-3 py-2 text-xs shadow-xl">
+      <span className="text-Black-80%">{name}: </span>
+      <span className="text-Black-100% font-bold">{value.toLocaleString()}건</span>
     </div>
   )
 }
@@ -72,7 +71,7 @@ export default function PassFailChart() {
   /* 로딩 스켈레톤 */
   if (isLoading || !stats) {
     return (
-      <div className="flex h-80 items-center justify-center rounded-[20px] border border-white/5 bg-[#171b22] p-6 animate-pulse">
+      <div className="flex h-80 items-center justify-center rounded-[20px] border border-Black-10% bg-white p-6 animate-pulse">
         <div className="h-52 w-52 rounded-full bg-white/10" />
       </div>
     )
@@ -85,13 +84,13 @@ export default function PassFailChart() {
   ]
 
   return (
-    <div className="h-80 overflow-hidden rounded-[20px] border border-white/5 bg-[#171b22] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
+    <div className="h-80 overflow-hidden rounded-[20px] border border-Black-10% bg-white p-6 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-white">Inspection Outcome</h2>
-          <p className="mt-1 text-xs text-slate-500">누적 PASS/FAIL 비율</p>
+          <h2 className="text-sm font-semibold text-Black-100%">Inspection Outcome</h2>
+          <p className="mt-1 text-xs text-Black-40%">누적 PASS/FAIL 비율</p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-lg bg-black/10 px-2 py-1 text-xs text-slate-400">
+        <div className="inline-flex items-center gap-2 rounded-lg bg-Black-4% px-2 py-1 text-xs text-Black-40%">
           <span className="h-2 w-2 rounded-full bg-pass" />
           실시간 누적
         </div>
@@ -127,7 +126,7 @@ export default function PassFailChart() {
             iconType="circle"
             wrapperStyle={{ paddingTop: '6px' }}
             formatter={(value) => (
-              <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>{value}</span>
+              <span style={{ color: '#1C1C1C', fontSize: '0.75rem' }}>{value}</span>
             )}
           />
         </PieChart>

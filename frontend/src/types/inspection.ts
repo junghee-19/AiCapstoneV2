@@ -135,12 +135,12 @@ export const DEFECT_COLOR: Record<string, string> = {
   metal_damage:     '#ef4444',
   pinhole:          '#eab308',  // yellow-500
   short:            '#dc2626',  // red-600
-  mount_hole:           '#22d3ee',  // cyan-400
-  gold_finger_row:      '#fb7185',  // rose-400
-  fiducial:             '#4ade80',  // green-400
-  smd_array_block:      '#a78bfa',  // violet-400
-  ic_chip:              '#fbbf24',  // amber-400
-  edge_connector_zone:  '#f472b6',  // pink-400
+  mount_hole:           '#0891b2',  // cyan-600
+  gold_finger_row:      '#e11d48',  // rose-600
+  fiducial:             '#16a34a',  // green-600
+  smd_array_block:      '#7c3aed',  // violet-600
+  ic_chip:              '#d97706',  // amber-600
+  edge_connector_zone:  '#db2777',  // pink-600
   // PatchCore Anomaly Detection — 종류 분류 안 됨, 위치만
   ANOMALY:              '#dc2626',  // red-600
 }

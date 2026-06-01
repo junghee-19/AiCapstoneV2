@@ -3,11 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 스크롤바 커스터마이징 (다크 테마에 맞게) */
+/* 스크롤바 — 라이트 테마 */
 ::-webkit-scrollbar        { width: 6px; height: 6px; }
-::-webkit-scrollbar-track  { background: #111827; }
-::-webkit-scrollbar-thumb  { background: #374151; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+::-webkit-scrollbar-track  { background: #FFFFFF; }
+::-webkit-scrollbar-thumb  { background: rgba(28, 28, 28, 0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(28, 28, 28, 0.4); }
 
 /* 부드러운 화면 전환 */
 * { transition-property: background-color, border-color, color;

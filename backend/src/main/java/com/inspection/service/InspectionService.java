@@ -10,7 +10,6 @@ import com.inspection.repository.DefectDetailRepository;
 import com.inspection.repository.InspectionLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -43,8 +42,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InspectionService {
 
-    /** 검사 이력 보관 기간(일). 이 기간을 초과한 레코드는 매일 자동 삭제된다. */
-    public static final int RETENTION_DAYS = 60;
+    /** 검사 이력 보관 기간 기본값. 실제 운영값은 AppSettingService 가 관리. */
+    public static final int DEFAULT_RETENTION_DAYS = 60;
 
     private final InspectionLogRepository inspectionLogRepository;
     private final DefectDetailRepository defectDetailRepository;
@@ -345,20 +344,18 @@ public class InspectionService {
     // ── 보관기간 자동 정리 ───────────────────────────────────────────────────
 
     /**
-     * 매일 새벽 3시(서버 로컬 시각)마다 {@value #RETENTION_DAYS}일을 초과한
-     * 검사 이력을 자동으로 삭제한다 (rolling retention).
-     *
-     * cron: 초 분 시 일 월 요일 → "0 0 3 * * *"
+     * 보관기간을 초과한 검사 이력을 즉시 삭제한다 (rolling retention).
+     * CleanupScheduler 가 AppSettingService 에 등록된 cron 시각에 호출하며,
+     * 사용자가 보관기간을 변경하면 다음 실행부터 새 값이 적용된다.
      */
-    @Scheduled(cron = "0 0 3 * * *")
     @Transactional
-    public void purgeExpiredInspections() {
-        LocalDateTime threshold = LocalDateTime.now().minusDays(RETENTION_DAYS);
+    public void purgeExpiredInspections(int retentionDays) {
+        LocalDateTime threshold = LocalDateTime.now().minusDays(retentionDays);
         defectDetailRepository.deleteByInspectionLogInspectedAtBefore(threshold);
         int removed = inspectionLogRepository.deleteByInspectedAtBefore(threshold);
         if (removed > 0) {
             log.info("[자동 정리] {}일 경과 검사 이력 {}건 삭제 (cutoff: {})",
-                    RETENTION_DAYS, removed, threshold);
+                    retentionDays, removed, threshold);
         }
     }
 }
