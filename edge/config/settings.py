@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     AUTO_INSPECTION_IDLE_POLL_SEC: float = Field(default=0.5, ge=0.05, le=10.0)
     # 자동 촬영 진입 조건: 이 개수 이상의 피듀셜이 보이면 PCB가 촬영 영역에 들어온 것으로 본다.
     PCB_CAPTURE_MIN_FIDUCIALS: int = Field(default=2, ge=1, le=4)
+    # 자동 촬영 기준 위치. fiducial 2개의 중점이 이 normalized 좌표 주변에 들어오면 촬영 가능.
+    # 2026-06-01 현재 샘플 4장 평균: mid=(0.481055, 0.501794), 1920x1080 기준 약 (924, 542).
+    PCB_CAPTURE_CENTER_X_RATIO: float = Field(default=0.481055, ge=0.0, le=1.0)
+    PCB_CAPTURE_CENTER_Y_RATIO: float = Field(default=0.501794, ge=0.0, le=1.0)
+    PCB_CAPTURE_TOLERANCE_X_RATIO: float = Field(default=0.05, gt=0.0, le=0.5)
+    PCB_CAPTURE_TOLERANCE_Y_RATIO: float = Field(default=0.05, gt=0.0, le=0.5)
+    # 피듀셜 간 거리/각도도 크게 벗어나면 다른 위치/스케일/회전으로 보고 자동 촬영을 보류한다.
+    PCB_CAPTURE_EXPECTED_SPAN_RATIO: float = Field(default=0.474459, gt=0.0, le=2.0)
+    PCB_CAPTURE_SPAN_TOLERANCE_RATIO: float = Field(default=0.06, gt=0.0, le=1.0)
+    PCB_CAPTURE_EXPECTED_ANGLE_DEG: float = Field(default=46.0)
+    PCB_CAPTURE_ANGLE_TOLERANCE_DEG: float = Field(default=5.0, gt=0.0, le=45.0)
     # Pi 터치스크린 라이브 스트림에 촬영 가이드/피듀셜 트래킹 오버레이 표시
     TOUCH_GUIDE_OVERLAY_ENABLED: bool = Field(default=True)
     # 오버레이용 피듀셜 YOLO 실행 주기(초). 매 프레임 추론하지 않도록 제한한다.
@@ -114,10 +125,10 @@ class Settings(BaseSettings):
 
     # ── 좌표 정합(Similarity: translation/rotation/scale) ────────────────────
     # 정합 기준 피듀셜 좌표 (정합 결과 이미지 좌표계)
-    ALIGN_REF_FIDUCIAL1_X: int = Field(default=278, ge=0)
-    ALIGN_REF_FIDUCIAL1_Y: int = Field(default=908, ge=0)
-    ALIGN_REF_FIDUCIAL2_X: int = Field(default=1528, ge=0)
-    ALIGN_REF_FIDUCIAL2_Y: int = Field(default=202, ge=0)
+    ALIGN_REF_FIDUCIAL1_X: int = Field(default=607, ge=0)
+    ALIGN_REF_FIDUCIAL1_Y: int = Field(default=726, ge=0)
+    ALIGN_REF_FIDUCIAL2_X: int = Field(default=1240, ge=0)
+    ALIGN_REF_FIDUCIAL2_Y: int = Field(default=358, ge=0)
     # 정합 출력 캔버스 크기
     ALIGN_OUTPUT_WIDTH: int = Field(default=1920, ge=320, le=4096)
     ALIGN_OUTPUT_HEIGHT: int = Field(default=1080, ge=240, le=4096)

@@ -120,14 +120,30 @@ def _pcb_capture_gate(frame: np.ndarray, alignment: AlignmentResult) -> tuple[bo
     h, w = frame.shape[:2]
     center_x = (alignment.fiducial1.center_x + alignment.fiducial2.center_x) / 2.0
     center_y = (alignment.fiducial1.center_y + alignment.fiducial2.center_y) / 2.0
-    center_dx = abs(center_x - (w / 2.0))
-    center_dy = abs(center_y - (h / 2.0))
+    target_x = w * settings.PCB_CAPTURE_CENTER_X_RATIO
+    target_y = h * settings.PCB_CAPTURE_CENTER_Y_RATIO
+    tolerance_x = w * settings.PCB_CAPTURE_TOLERANCE_X_RATIO
+    tolerance_y = h * settings.PCB_CAPTURE_TOLERANCE_Y_RATIO
+    center_dx = abs(center_x - target_x)
+    center_dy = abs(center_y - target_y)
     centered = (
-        center_dx <= (w * settings.CAMERA_CENTER_TOLERANCE_RATIO)
-        and center_dy <= (h * settings.CAMERA_CENTER_TOLERANCE_RATIO)
+        center_dx <= tolerance_x
+        and center_dy <= tolerance_y
     )
     if not centered:
         return False, f"center_offset=({center_dx:.0f},{center_dy:.0f})"
+
+    dx_norm = (alignment.fiducial2.center_x - alignment.fiducial1.center_x) / max(1.0, float(w))
+    dy_norm = (alignment.fiducial2.center_y - alignment.fiducial1.center_y) / max(1.0, float(h))
+    span_ratio = math.hypot(dx_norm, dy_norm)
+    span_error = abs(span_ratio - settings.PCB_CAPTURE_EXPECTED_SPAN_RATIO)
+    if span_error > settings.PCB_CAPTURE_SPAN_TOLERANCE_RATIO:
+        return False, f"span_error={span_error:.3f}"
+
+    angle_error = abs(float(alignment.angle_error_deg) - settings.PCB_CAPTURE_EXPECTED_ANGLE_DEG)
+    if angle_error > settings.PCB_CAPTURE_ANGLE_TOLERANCE_DEG:
+        return False, f"angle_error={angle_error:.1f}"
+
     return True, f"center=({center_x:.0f},{center_y:.0f})"
 
 
@@ -190,11 +206,13 @@ async def _wait_for_centered_stable_pcb_frame() -> tuple[np.ndarray, str, list, 
             signature = (center_x, center_y, span_px, float(alignment.angle_error_deg))
             latest_valid = (frame, fiducials, fiducial_ms, alignment)
 
-            center_dx = abs(center_x - (w / 2.0))
-            center_dy = abs(center_y - (h / 2.0))
+            target_x = w * settings.PCB_CAPTURE_CENTER_X_RATIO
+            target_y = h * settings.PCB_CAPTURE_CENTER_Y_RATIO
+            center_dx = abs(center_x - target_x)
+            center_dy = abs(center_y - target_y)
             centered = (
-                center_dx <= (w * settings.CAMERA_CENTER_TOLERANCE_RATIO)
-                and center_dy <= (h * settings.CAMERA_CENTER_TOLERANCE_RATIO)
+                center_dx <= (w * settings.PCB_CAPTURE_TOLERANCE_X_RATIO)
+                and center_dy <= (h * settings.PCB_CAPTURE_TOLERANCE_Y_RATIO)
             )
 
             stable_motion = False

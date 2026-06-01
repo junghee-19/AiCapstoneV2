@@ -106,9 +106,10 @@ def _draw_detection_overlay(frame: np.ndarray, fiducials: list[Any], alignment: 
     annotated = frame.copy()
     h, w = annotated.shape[:2]
 
-    tol_x = int(w * settings.CAMERA_CENTER_TOLERANCE_RATIO)
-    tol_y = int(h * settings.CAMERA_CENTER_TOLERANCE_RATIO)
-    cx, cy = w // 2, h // 2
+    tol_x = int(w * settings.PCB_CAPTURE_TOLERANCE_X_RATIO)
+    tol_y = int(h * settings.PCB_CAPTURE_TOLERANCE_Y_RATIO)
+    cx = int(w * settings.PCB_CAPTURE_CENTER_X_RATIO)
+    cy = int(h * settings.PCB_CAPTURE_CENTER_Y_RATIO)
     guide_x1 = max(0, cx - tol_x)
     guide_y1 = max(0, cy - tol_y)
     guide_x2 = min(w - 1, cx + tol_x)
@@ -267,7 +268,16 @@ async def get_status() -> dict[str, Any]:
             "auto_inspection_enabled": settings.AUTO_INSPECTION_ENABLED,
             "auto_inspection_idle_poll_sec": settings.AUTO_INSPECTION_IDLE_POLL_SEC,
             "pcb_capture_min_fiducials": settings.PCB_CAPTURE_MIN_FIDUCIALS,
-            "camera_center_tolerance_ratio": settings.CAMERA_CENTER_TOLERANCE_RATIO,
+            "pcb_capture_center": {
+                "x_ratio": settings.PCB_CAPTURE_CENTER_X_RATIO,
+                "y_ratio": settings.PCB_CAPTURE_CENTER_Y_RATIO,
+            },
+            "pcb_capture_tolerance": {
+                "x_ratio": settings.PCB_CAPTURE_TOLERANCE_X_RATIO,
+                "y_ratio": settings.PCB_CAPTURE_TOLERANCE_Y_RATIO,
+            },
+            "pcb_capture_expected_span_ratio": settings.PCB_CAPTURE_EXPECTED_SPAN_RATIO,
+            "pcb_capture_expected_angle_deg": settings.PCB_CAPTURE_EXPECTED_ANGLE_DEG,
         },
     }
 
