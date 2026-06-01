@@ -145,13 +145,15 @@ function DeviceManagementSection() {
   const total = devices.length
   const connected = devices.filter((d) => d.connected).length
   const captureM = useMutation({
-    mutationFn: (deviceId: string) => triggerDatasetCapture(deviceId, 10, 3),
-    onSuccess: () => {
+    mutationFn: ({ deviceId, count, interval }: { deviceId: string; count: number; interval: number }) =>
+      triggerDatasetCapture(deviceId, count, interval),
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['edge-devices'] })
+      const refreshDelayMs = Math.max(3_000, variables.count * variables.interval * 1000 + 2_000)
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['dataset-images'] })
         queryClient.invalidateQueries({ queryKey: ['edge-devices'] })
-      }, 32_000)
+      }, refreshDelayMs)
     },
   })
 
@@ -205,14 +207,28 @@ function DeviceManagementSection() {
                     {formatTimestamp(device.lastSeenAt)}
                   </td>
                   <td className="px-3 py-2">
-                    <button
-                      onClick={() => captureM.mutate(device.deviceId)}
-                      disabled={!device.connected || captureM.isPending}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/40 bg-sky-500/10 px-2.5 py-1.5 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      <Camera size={13} />
-                      10장 촬영
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() =>
+                          captureM.mutate({ deviceId: device.deviceId, count: 1, interval: 1 })
+                        }
+                        disabled={!device.connected || captureM.isPending}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        <Camera size={13} />
+                        1장 촬영
+                      </button>
+                      <button
+                        onClick={() =>
+                          captureM.mutate({ deviceId: device.deviceId, count: 10, interval: 3 })
+                        }
+                        disabled={!device.connected || captureM.isPending}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/40 bg-sky-500/10 px-2.5 py-1.5 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        <Camera size={13} />
+                        10장 촬영
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
