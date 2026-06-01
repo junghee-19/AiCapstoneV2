@@ -20,7 +20,9 @@ pi-touchscreen/
 5. `자동 검사 시작` 터치 → `/edge/inspect/auto/start` 호출
 6. 자동 검사 실행 중에는 LIVE 화면과 `검사 중지` 버튼 표시
 7. PCB가 촬영 영역에 들어오면 BUSY 화면, 검사 완료 → RESULT 화면
-8. `검사 중지` 터치 → `/edge/inspect/auto/stop` 호출 후 HOME 복귀
+8. RESULT 화면은 카운트다운 후 자동으로 LIVE 화면에 복귀
+9. 복귀 후 촬영 쿨타임 동안 좌측 상단 배지를 `대기중...`으로 표시
+10. `검사 중지` 터치 → `/edge/inspect/auto/stop` 호출 후 HOME 복귀
 
 ## edge 와의 관계
 

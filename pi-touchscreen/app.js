@@ -12,10 +12,18 @@
   const startAutoButton = document.getElementById('start-auto')
   const stopAutoLiveButton = document.getElementById('stop-auto-live')
   const stopAutoFloatingButton = document.getElementById('stop-auto-floating')
+  const liveBadgeText = document.getElementById('live-badge-text')
+  const resultCountdown = document.getElementById('result-countdown')
+  const resultCountdownText = document.getElementById('result-countdown-text')
+  const resultCountdownFill = document.getElementById('result-countdown-fill')
 
   let autoRunning = false
   let edgeOnline = false
   let actionInFlight = false
+  let resultDisplaySeconds = 4
+  let cooldownRemainingSeconds = 0
+  let resultCountdownTimer = null
+  let resultDismissTimer = null
 
   // ── 결함 종류별 색상·라벨 (대시보드와 동일 매핑) ─────────────────────────
   const DEFECT_COLOR = {
@@ -95,6 +103,7 @@
   async function startAutoInspection() {
     if (actionInFlight) return
     actionInFlight = true
+    clearResultCountdown()
     setButtonBusy(startAutoButton, true, '시작 중...')
     try {
       const res = await fetch('/edge/inspect/auto/start?interval=5', { method: 'POST' })
@@ -114,6 +123,7 @@
   async function stopAutoInspection() {
     if (actionInFlight) return
     actionInFlight = true
+    clearResultCountdown()
     setButtonBusy(stopAutoLiveButton, true, '중지 중...')
     setButtonBusy(stopAutoFloatingButton, true, '중지 중...')
     try {
@@ -170,23 +180,47 @@
 
     if (autoResult.status === 'fulfilled') {
       autoRunning = Boolean(autoResult.value.running)
+      resultDisplaySeconds = Number(autoResult.value.result_display_seconds || resultDisplaySeconds)
+      cooldownRemainingSeconds = Number(autoResult.value.cooldown_remaining_seconds || 0)
       body.dataset.auto = autoRunning ? 'running' : 'stopped'
       autoState.textContent = autoRunning
-        ? (autoResult.value.waiting_for_pcb_exit ? 'PCB 배출 대기' : '실행 중')
+        ? statusTextForAuto(autoResult.value)
         : '중지됨'
+      updateLiveBadge(autoResult.value)
       setLiveStreamEnabled(autoRunning)
     } else {
       autoRunning = false
+      cooldownRemainingSeconds = 0
       body.dataset.auto = 'stopped'
       autoState.textContent = '상태 확인 실패'
+      updateLiveBadge(null)
       setLiveStreamEnabled(false)
     }
+  }
+
+  function statusTextForAuto(auto) {
+    if (Number(auto.cooldown_remaining_seconds || 0) > 0) {
+      return `쿨타임 ${Math.ceil(auto.cooldown_remaining_seconds)}초`
+    }
+    if (auto.waiting_for_pcb_exit) return 'PCB 배출 대기'
+    return '실행 중'
+  }
+
+  function updateLiveBadge(auto) {
+    if (!liveBadgeText) return
+    const remaining = Number((auto && auto.cooldown_remaining_seconds) || cooldownRemainingSeconds)
+    const cooling = autoRunning && remaining > 0
+    body.dataset.live = cooling ? 'cooldown' : 'live'
+    liveBadgeText.textContent = cooling ? `대기중... ${Math.ceil(remaining)}초` : 'LIVE'
   }
 
   function handleStateUpdate(state) {
     const status = state.status || 'IDLE'
     body.dataset.status = status
 
+    if (status !== 'RESULT') {
+      clearResultCountdown()
+    }
     if (status === 'BUSY') {
       busyMessage.textContent = state.message || '검사 중...'
     }
@@ -205,6 +239,7 @@
     const result = state.result || 'SKIPPED'
     resultHeader.dataset.result = result
     resultText.textContent = result
+    startResultCountdown()
 
     const defects = state.defects || []
     const fiducials = state.fiducials || []
@@ -220,6 +255,47 @@
       ctx.font = '20px sans-serif'
       ctx.textAlign = 'center'
       ctx.fillText('이미지 없음', canvas.width / 2, canvas.height / 2)
+    }
+  }
+
+  function startResultCountdown() {
+    clearResultCountdown()
+    const totalMs = Math.max(1000, resultDisplaySeconds * 1000)
+    const startedAt = Date.now()
+
+    const renderTick = () => {
+      const elapsed = Date.now() - startedAt
+      const remainingMs = Math.max(0, totalMs - elapsed)
+      const remainingSec = Math.ceil(remainingMs / 1000)
+      if (resultCountdown) resultCountdown.style.display = 'grid'
+      if (resultCountdownText) {
+        resultCountdownText.textContent = `${remainingSec}초 후 라이브 화면으로 돌아갑니다`
+      }
+      if (resultCountdownFill) {
+        const ratio = Math.max(0, Math.min(1, remainingMs / totalMs))
+        resultCountdownFill.style.transform = `scaleX(${ratio})`
+      }
+    }
+
+    renderTick()
+    resultCountdownTimer = window.setInterval(renderTick, 100)
+    resultDismissTimer = window.setTimeout(() => {
+      clearResultCountdown()
+      fetch('/touch/dismiss', { method: 'POST' }).catch((err) => {
+        console.warn('[touch] 자동 dismiss 요청 실패:', err)
+      })
+      refreshControlStatus()
+    }, totalMs)
+  }
+
+  function clearResultCountdown() {
+    if (resultCountdownTimer != null) {
+      window.clearInterval(resultCountdownTimer)
+      resultCountdownTimer = null
+    }
+    if (resultDismissTimer != null) {
+      window.clearTimeout(resultDismissTimer)
+      resultDismissTimer = null
     }
   }
 
@@ -370,7 +446,7 @@
   }
 
   refreshControlStatus()
-  setInterval(refreshControlStatus, 2000)
+  setInterval(refreshControlStatus, 1000)
 
   // ── RESULT 화면 탭 시 LIVE 로 복귀 ─────────────────────────────────────
   const resultScreen = document.querySelector('.screen-result')
@@ -378,9 +454,11 @@
     const dismiss = () => {
       // RESULT 상태일 때만 작동 (IDLE/BUSY 에서는 무시)
       if (body.dataset.status !== 'RESULT') return
+      clearResultCountdown()
       fetch('/touch/dismiss', { method: 'POST' }).catch((err) => {
         console.warn('[touch] dismiss 요청 실패:', err)
       })
+      refreshControlStatus()
     }
     resultScreen.addEventListener('click', dismiss)
     resultScreen.addEventListener('touchend', (e) => {

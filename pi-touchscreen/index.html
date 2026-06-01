@@ -44,7 +44,7 @@
   <section class="screen screen-live">
     <img id="live-stream" data-src="/edge/camera/stream" alt="라이브 카메라" />
     <div class="status-badge live">
-      <span class="dot"></span>LIVE
+      <span class="dot"></span><span id="live-badge-text">LIVE</span>
     </div>
     <div class="auto-banner">
       <span>자동 검사 실행 중</span>
@@ -67,6 +67,12 @@
     </div>
     <div class="result-canvas-wrap">
       <canvas id="result-canvas"></canvas>
+    </div>
+    <div class="result-countdown" id="result-countdown">
+      <span id="result-countdown-text">곧 라이브 화면으로 돌아갑니다</span>
+      <div class="countdown-track">
+        <div class="countdown-fill" id="result-countdown-fill"></div>
+      </div>
     </div>
   </section>
 

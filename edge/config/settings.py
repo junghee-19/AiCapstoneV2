@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     AUTO_INSPECTION_ENABLED: bool = Field(default=True)
     # 자동 루프에서 PCB가 없을 때 카메라를 다시 확인하는 주기(초)
     AUTO_INSPECTION_IDLE_POLL_SEC: float = Field(default=0.5, ge=0.05, le=10.0)
+    # 검사 결과 화면을 터치스크린에 유지하는 시간(초). 이후 자동으로 라이브 화면으로 복귀한다.
+    AUTO_RESULT_DISPLAY_SEC: float = Field(default=4.0, ge=1.0, le=30.0)
+    # 결과 화면 복귀 후 다음 자동 촬영까지 최소 대기 시간(초)
+    AUTO_CAPTURE_COOLDOWN_SEC: float = Field(default=5.0, ge=0.0, le=60.0)
     # 자동 촬영 진입 조건: 이 개수 이상의 피듀셜이 보이면 PCB가 촬영 영역에 들어온 것으로 본다.
     PCB_CAPTURE_MIN_FIDUCIALS: int = Field(default=2, ge=1, le=4)
     # 자동 촬영 기준 위치. fiducial 2개의 중점이 이 normalized 좌표 주변에 들어오면 촬영 가능.
